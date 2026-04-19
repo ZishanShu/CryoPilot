@@ -1,0 +1,14 @@
+# Map-level routing registry entry using the real mid3d project fixture.
+case_id: mid3d_map_only_model_building
+case_type: map_level_case
+dataset_name: real_mid3d_project
+dataset_root: null
+input_state:
+  has_map: true
+  has_sequence: true
+available_inputs:
+  map_path: true
+  sequence_path: true
+target_stage: model_building
+evaluation_mode: success_only
+notes: Map-level routing ablation entry (ModelAngelo / EModelX / MICA).
