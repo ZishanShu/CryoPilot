@@ -1,0 +1,6 @@
+mica_repo_dir: null
+mica_python: null
+mica_default_device: cuda
+mica_default_resolution: null
+mica_default_run_pulchra: false
+mica_default_run_phenix: false

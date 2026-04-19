@@ -1,0 +1,25 @@
+# Optional overrides for backend resolution (merged with policy_rules.yaml domains).
+# See agent/backend_registry.py for defaults and merge order.
+
+picking:
+  default_backend: relion_log
+  allowed_backends:
+    - relion_log
+    - topaz
+    - cryolo
+  project_overrides: {}
+
+heterogeneity:
+  default_backend: human_review
+  allowed_backends:
+    - human_review
+    - cryodrgn
+  project_overrides: {}
+
+model_building:
+  default_backend: modelangelo
+  allowed_backends:
+    - modelangelo
+    - emodelx
+    - mica
+  project_overrides: {}

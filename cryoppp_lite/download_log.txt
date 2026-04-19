@@ -1,0 +1,11 @@
+nohup: ignoring input
+目标目录: /root/share/szs/CryoAgent/cryoppp_lite/cryoppp_lite
+日志目录: /root/share/szs/CryoAgent/cryoppp_lite/cryoppp_lite/logs
+
+[开始下载] https://calla.rnet.missouri.edu/cryoppp_lite/10005.tar.gz
+2026-04-05 10:17:56 URL:https://calla.rnet.missouri.edu/cryoppp_lite/10005.tar.gz [1806206031/1806206031] -> "/root/share/szs/CryoAgent/cryoppp_lite/cryoppp_lite/10005.tar.gz" [1]
+[下载完成] 10005.tar.gz
+[开始下载] https://calla.rnet.missouri.edu/cryoppp_lite/10017.tar.gz
+2026-04-05 10:48:08 URL:https://calla.rnet.missouri.edu/cryoppp_lite/10017.tar.gz [499013261/499013261] -> "/root/share/szs/CryoAgent/cryoppp_lite/cryoppp_lite/10017.tar.gz" [2]
+[下载完成] 10017.tar.gz
+[开始下载] https://calla.rnet.missouri.edu/cryoppp_lite/10028.tar.gz

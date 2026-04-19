@@ -1,0 +1,3 @@
+data_model_general
+_rlnEstimatedResolution 6.2
+completed

@@ -1,0 +1,8 @@
+{
+  "name": "run_import_preprocess",
+  "reason": "Preprocess (Import/MotionCorr/CTF) not completed.",
+  "parameters": {
+    "project_path": "/root/share/szs/CryoAgent/cryoem_relion_agent/demo_workspace/fake_relion_project"
+  },
+  "priority": 80
+}

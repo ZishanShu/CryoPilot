@@ -1,0 +1,8 @@
+# Optional cryoDRGN defaults (merged with action parameters).
+
+cryodrgn_executable: null
+cryodrgn_default_zdim: 10
+cryodrgn_default_epochs: 10
+cryodrgn_default_downsample_box_size: null
+cryodrgn_default_device: null
+cryodrgn_analyze_after_train: false

@@ -1,0 +1,66 @@
+{
+  "meta": {
+    "generated_at": "2026-04-07T21:50:58.511392Z",
+    "agent_version": "0.1.0",
+    "report_type": "cryoem_relion_agent_report"
+  },
+  "state": {
+    "project_id": "Tutorial5.0",
+    "project_path": "/root/share/szs/CryoAgent/Tutorial5.0",
+    "stage": "PostProcess",
+    "status": "running",
+    "last_action": null,
+    "n_micrographs": 24,
+    "n_particles_picked": 6830,
+    "n_particles_after_2d": 6830,
+    "n_particles_after_3d": 4599,
+    "estimated_resolution": 3.387915,
+    "orientation_warning": false,
+    "heterogeneity_warning": false,
+    "map_path": "/root/share/szs/CryoAgent/Tutorial5.0/PostProcess/job035/postprocess_masked.mrc",
+    "sequence_path": null,
+    "notes": [
+      "Project scan completed with conservative heuristics."
+    ],
+    "updated_at": "2026-04-07T21:50:58.510876Z"
+  },
+  "qc": {
+    "motioncorr_completed": true,
+    "ctf_completed": true,
+    "picking_completed": true,
+    "class2d_completed": true,
+    "init3d_completed": true,
+    "refine3d_completed": true,
+    "retain_ratio_2d": 1.0,
+    "retain_ratio_3d": 0.6734,
+    "current_resolution": 3.387915,
+    "particle_count_warning": true,
+    "orientation_warning": false,
+    "heterogeneity_warning": false,
+    "confidence_score": 0.85
+  },
+  "recent_action": null,
+  "next_action": {
+    "name": "run_validation",
+    "reason": "Map available but structure routing unavailable; fallback to validation.",
+    "parameters": {
+      "map_path": "/root/share/szs/CryoAgent/Tutorial5.0/PostProcess/job035/postprocess_masked.mrc",
+      "current_resolution": 3.387915,
+      "routing_triggered": false,
+      "routing_reason": "missing_sequence"
+    },
+    "priority": 55
+  },
+  "human_review_required": false,
+  "human_review_reasons": [],
+  "structure_routing": {
+    "selected_tool": null,
+    "rationale": "missing_sequence",
+    "alternatives_considered": [
+      "run_modelangelo",
+      "run_emodelx",
+      "run_mica"
+    ]
+  },
+  "extra": {}
+}

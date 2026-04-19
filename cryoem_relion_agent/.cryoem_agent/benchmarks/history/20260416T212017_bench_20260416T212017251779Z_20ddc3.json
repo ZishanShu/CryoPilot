@@ -1,0 +1,576 @@
+{
+  "benchmark_diff": {
+    "capability_diffs": {
+      "added_backends": [],
+      "changed_backends": [],
+      "changed_fields_by_backend": {},
+      "removed_backends": []
+    },
+    "case_diffs": [
+      {
+        "artifacts_changed": false,
+        "backend": "topaz",
+        "benchmark_id": "cryoppp_topaz_smoke_10005",
+        "blocked_reason_changed": true,
+        "category": "picking",
+        "command_changed": true,
+        "current_execution_mode": "real",
+        "current_status": "failed",
+        "diff_class": "unchanged",
+        "previous_execution_mode": "real",
+        "previous_status": "failed",
+        "runtime_seconds_delta": 0.3376,
+        "selection_changed": false,
+        "status_changed": false
+      }
+    ],
+    "overall_status_change": "unchanged",
+    "selection_diffs": {
+      "cases_with_fallback_change": [],
+      "cases_with_reason_change": [],
+      "cases_with_selection_change": []
+    },
+    "summary_diffs": {
+      "backend_set_added": [],
+      "backend_set_removed": [],
+      "blocked_delta": 0,
+      "category_set_added": [],
+      "category_set_removed": [],
+      "completed_delta": 0,
+      "failed_delta": 0,
+      "total_cases_delta": 0
+    }
+  },
+  "benchmark_results": [
+    {
+      "artifacts": [
+        "/root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/outputs/topaz_pick/picks.star"
+      ],
+      "backend": "topaz",
+      "benchmark_id": "cryoppp_topaz_smoke_10005",
+      "blocked_reason": "# Beginning extraction\nTraceback (most recent call last):\n  File \"/root/share/conda_envs/cryoagent/bin/topaz\", line 6, in <module>\n    sys.exit(main())\n  File \"/root/share/conda_envs/cryoagent/lib/python3.10/site-packages/topaz/main.py\", line 148, in main\n    args.func(args)\n  File \"/root/share/conda_envs/cryoagent/lib/python3.10/site-packages/topaz/commands/extract.py\", line 64, in main\n    extract_particles(args.paths, args.model, args.device, args.batch_size, args.threshold, args.radius, args.num_workers, \n  File \"/root/share/conda_envs/cryoagent/lib/python3.10/site-packages/topaz/extract.py\", line 333, in extract_particles\n    for path,score,coords in nms_iterator(stream, radius, threshold, pool=pool, dims=dims, verbose=verbose):\n  File \"/root/share/conda_envs/cryoagent/lib/python3.10/site-packages/topaz/extract.py\", line 102, in nms_iterator\n    for name, score in paths_scores:\n  File \"/root/share/conda_envs/cryoagent/lib/python3.10/site-packages/topaz/extract.py\", line 236, in score_images\n    original_shape = image.shape\nAttributeError: 'PngImageFile' object has no attribute 'shape'. Did you mean: 'save'?",
+      "category": "picking",
+      "command": "/root/share/conda_envs/cryoagent/bin/topaz extract -r 71 -t -6.0 -d 0 --format star -o /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/outputs/topaz_pick/picks.star /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0002_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0004_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0005_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0006_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0010_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0019_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0028_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0029_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0046_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0057_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0060_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0061_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0069_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0072_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0079_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0080_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0088_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0089_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0090_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0092_2x_SumCorr.png",
+      "execution_mode": "real",
+      "extra": {
+        "dataset_id": "10005",
+        "llm_supervision_payloads": {
+          "evaluation": {
+            "dataset_id": "10005",
+            "f1": 0.0,
+            "gt_count": 0,
+            "matched_count": 0,
+            "particle_diameter_angstrom": 142.0,
+            "precision": 0.0,
+            "predicted_count": 0,
+            "recall": 0.0,
+            "topaz_threshold": -6.0
+          },
+          "execution": {
+            "artifact_summary": {
+              "artifacts": [
+                "/root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/outputs/topaz_pick/picks.star"
+              ],
+              "generated_paths": [
+                "/root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/outputs/topaz_pick/picks.star"
+              ]
+            },
+            "benchmark_result_status": "failed",
+            "command": "/root/share/conda_envs/cryoagent/bin/topaz extract -r 71 -t -6.0 -d 0 --format star -o /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/outputs/topaz_pick/picks.star /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0002_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0004_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0005_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0006_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0010_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0019_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0028_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0029_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0046_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0057_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0060_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0061_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0069_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0072_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0079_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0080_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0088_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0089_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0090_2x_SumCorr.png /root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/data/10005/converted_micrographs/stack_0092_2x_SumCorr.png",
+            "output_path": "/root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/outputs/topaz_pick/picks.star",
+            "return_code": 1,
+            "stdout_stderr_summary": {
+              "stderr_head": "# Beginning extraction\nTraceback (most recent call last):\n  File \"/root/share/conda_envs/cryoagent/bin/topaz\", line 6, in <module>\n    sys.exit(main())\n  File \"/root/share/conda_envs/cryoagent/lib/python3.10/site-packages/topaz/main.py\", line 148, in main\n    args.func(args)\n  File \"/root/share/conda_envs/cryoagent/lib/python3.10/site-packages/topaz/commands/extract.py\", line 64, in main\n    extract_particles(args.paths, args.model, args.device, args.batch_size, args.threshold, args.radius, args",
+              "stdout_head": ""
+            }
+          },
+          "preflight": {
+            "blocked_reason": null,
+            "dependency_status": {
+              "execution_mode": "real",
+              "missing_dependencies": []
+            },
+            "preflight_result": {
+              "available": true,
+              "backend_name": "topaz",
+              "blocked_reason": null,
+              "category": "picking",
+              "command_mode": "extract",
+              "executable_path": "/root/share/conda_envs/cryoagent/bin/topaz",
+              "execution_mode": "real",
+              "input_summary": "micrographs_star=/root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/relion_inputs/micrographs.star (micrographs_star_path), diameter_angstrom=142.0, output_dir=/root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/outputs/topaz_pick",
+              "missing_dependencies": [],
+              "missing_inputs": [],
+              "model_source": "default_pretrained",
+              "warnings": []
+            },
+            "required_inputs_status": {
+              "available": true,
+              "missing_inputs": []
+            },
+            "selected_backend": "topaz",
+            "selection_reason": null
+          }
+        },
+        "picking_evaluation": {
+          "evaluation_available": false,
+          "f1": 0.0,
+          "gt_count": 0,
+          "match_radius_px": 8.0,
+          "matched_count": 0,
+          "precision": 0.0,
+          "predicted_count": 0,
+          "recall": 0.0
+        },
+        "smoke_run_checks": {
+          "evaluation_available": false,
+          "execution_ok": false,
+          "f1": 0.0,
+          "non_empty_output": true,
+          "precision": 0.0,
+          "preflight_ok": true,
+          "recall": 0.0,
+          "smoke_run_success": false
+        }
+      },
+      "generated_paths": [
+        "/root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/outputs/topaz_pick/picks.star"
+      ],
+      "notes": "First real CryoPPP subset Topaz smoke run.",
+      "preflight": {
+        "available": true,
+        "backend_name": "topaz",
+        "blocked_reason": null,
+        "category": "picking",
+        "command_mode": "extract",
+        "executable_path": "/root/share/conda_envs/cryoagent/bin/topaz",
+        "execution_mode": "real",
+        "input_summary": "micrographs_star=/root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/relion_inputs/micrographs.star (micrographs_star_path), diameter_angstrom=142.0, output_dir=/root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/outputs/topaz_pick",
+        "missing_dependencies": [],
+        "missing_inputs": [],
+        "model_source": "default_pretrained",
+        "warnings": []
+      },
+      "return_code": 1,
+      "runtime_seconds": 5.0786,
+      "selection_decision": null,
+      "status": "failed",
+      "topaz_output_path": "/root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/outputs/topaz_pick/picks.star"
+    }
+  ],
+  "benchmark_summary": {
+    "backends_covered": [
+      "topaz"
+    ],
+    "blocked": 0,
+    "categories_covered": [
+      "picking"
+    ],
+    "completed": 0,
+    "failed": 1,
+    "summary_markdown": "# Backend Benchmark Summary\n\n- Cases: 1\n- Completed: 0\n- Blocked: 0\n- Failed: 1\n\n## Results\n- cryoppp_topaz_smoke_10005: backend=topaz status=failed mode=real\n",
+    "total_cases": 1
+  },
+  "capability_snapshot": {
+    "cryodrgn": {
+      "backend_name": "cryodrgn",
+      "category": "heterogeneity",
+      "execution_mode_supported": [
+        "real",
+        "unavailable"
+      ],
+      "fallback_candidates": [
+        "human_review"
+      ],
+      "maturity_level": "real",
+      "notes": "Preferred when STAR/pose/ctf are available.",
+      "optional_dependencies": [
+        "gpu"
+      ],
+      "optional_inputs": [
+        "particles_star_path",
+        "pose_pkl_path",
+        "ctf_pkl_path",
+        "particles_mrcs_path",
+        "box_size",
+        "apix",
+        "downsample_box_size",
+        "cryodrgn_executable",
+        "cryodrgn_device",
+        "cryodrgn_zdim",
+        "cryodrgn_epochs",
+        "cryodrgn_multigpu",
+        "cryodrgn_analyze_after_train",
+        "datadir",
+        "run_id",
+        "cryodrgn_train_subdir"
+      ],
+      "primary_outputs": [
+        "pose_pkl",
+        "ctf_pkl",
+        "train_weights",
+        "latent_analysis"
+      ],
+      "required_dependencies": [
+        "cryodrgn_executable"
+      ],
+      "required_inputs": [
+        "output_dir"
+      ],
+      "supports_af3_prior": false,
+      "supports_consensus_pose": true,
+      "supports_gpu": true,
+      "supports_map_input": false,
+      "supports_particle_input": true,
+      "supports_sequence_input": false,
+      "typical_use_case": "Consensus-pose heterogeneity modeling",
+      "upstream_assumptions": [
+        "particles_star_path or external stack"
+      ]
+    },
+    "cryolo": {
+      "backend_name": "cryolo",
+      "category": "picking",
+      "execution_mode_supported": [
+        "dry_run_placeholder"
+      ],
+      "fallback_candidates": [
+        "relion_log"
+      ],
+      "maturity_level": "placeholder",
+      "notes": "Not yet first-party integrated.",
+      "optional_dependencies": [],
+      "optional_inputs": [],
+      "primary_outputs": [
+        "cryolo_predictions"
+      ],
+      "required_dependencies": [
+        "cryolo"
+      ],
+      "required_inputs": [],
+      "supports_af3_prior": false,
+      "supports_consensus_pose": false,
+      "supports_gpu": true,
+      "supports_map_input": false,
+      "supports_particle_input": false,
+      "supports_sequence_input": false,
+      "typical_use_case": "Alternative picker path",
+      "upstream_assumptions": [
+        "ctf_completed"
+      ]
+    },
+    "emodelx": {
+      "backend_name": "emodelx",
+      "category": "model_building",
+      "execution_mode_supported": [
+        "real",
+        "unavailable"
+      ],
+      "fallback_candidates": [
+        "modelangelo"
+      ],
+      "maturity_level": "real",
+      "notes": "Temp_free first; temp_flex optional.",
+      "optional_dependencies": [
+        "pulchra",
+        "phenix"
+      ],
+      "optional_inputs": [
+        "run_id",
+        "chain_count",
+        "emodelx_python",
+        "emodelx_protocol",
+        "emodelx_weights_dir",
+        "run_pulchra",
+        "pulchra_path",
+        "run_phenix",
+        "phenix_act",
+        "resolution",
+        "template_dir",
+        "download_afdb",
+        "afdb_allow_seq_id"
+      ],
+      "primary_outputs": [
+        "emodelx_models"
+      ],
+      "required_dependencies": [
+        "emodelx_repo_dir",
+        "emodelx_weights",
+        "emodelx_python"
+      ],
+      "required_inputs": [
+        "map_path",
+        "sequence_path",
+        "output_dir",
+        "emodelx_repo_dir"
+      ],
+      "supports_af3_prior": false,
+      "supports_consensus_pose": false,
+      "supports_gpu": true,
+      "supports_map_input": true,
+      "supports_particle_input": false,
+      "supports_sequence_input": true,
+      "typical_use_case": "Repo-oriented map+sequence modeling",
+      "upstream_assumptions": [
+        "map_path",
+        "sequence_path"
+      ]
+    },
+    "human_review": {
+      "backend_name": "human_review",
+      "category": "heterogeneity",
+      "execution_mode_supported": [
+        "manual_review"
+      ],
+      "fallback_candidates": [],
+      "maturity_level": "manual",
+      "notes": "Human-in-the-loop gate.",
+      "optional_dependencies": [],
+      "optional_inputs": [],
+      "primary_outputs": [
+        "manual_decision"
+      ],
+      "required_dependencies": [],
+      "required_inputs": [],
+      "supports_af3_prior": false,
+      "supports_consensus_pose": false,
+      "supports_gpu": false,
+      "supports_map_input": false,
+      "supports_particle_input": true,
+      "supports_sequence_input": false,
+      "typical_use_case": "Fallback for ambiguous heterogeneity decisions",
+      "upstream_assumptions": [
+        "heterogeneity_warning"
+      ]
+    },
+    "mica": {
+      "backend_name": "mica",
+      "category": "model_building",
+      "execution_mode_supported": [
+        "real",
+        "unavailable"
+      ],
+      "fallback_candidates": [
+        "emodelx",
+        "modelangelo"
+      ],
+      "maturity_level": "real",
+      "notes": "Requires AF3 directory populated with structures/results.",
+      "optional_dependencies": [
+        "pulchra",
+        "phenix"
+      ],
+      "optional_inputs": [
+        "af3_result_dir",
+        "run_id",
+        "chain_count",
+        "mica_python",
+        "mica_weights_dir",
+        "mica_config_path",
+        "mica_device",
+        "mica_resolution",
+        "run_pulchra",
+        "pulchra_path",
+        "run_phenix",
+        "phenix_act"
+      ],
+      "primary_outputs": [
+        "mica_models"
+      ],
+      "required_dependencies": [
+        "mica_repo_dir",
+        "mica_weights",
+        "mica_python"
+      ],
+      "required_inputs": [
+        "map_path",
+        "sequence_path",
+        "output_dir",
+        "mica_repo_dir",
+        "af3_dir"
+      ],
+      "supports_af3_prior": true,
+      "supports_consensus_pose": false,
+      "supports_gpu": true,
+      "supports_map_input": true,
+      "supports_particle_input": false,
+      "supports_sequence_input": true,
+      "typical_use_case": "AF3-aware map+sequence model building",
+      "upstream_assumptions": [
+        "map_path",
+        "sequence_path",
+        "af3_dir"
+      ]
+    },
+    "modelangelo": {
+      "backend_name": "modelangelo",
+      "category": "model_building",
+      "execution_mode_supported": [
+        "real"
+      ],
+      "fallback_candidates": [],
+      "maturity_level": "real",
+      "notes": "Current baseline model-building backend.",
+      "optional_dependencies": [
+        "gpu"
+      ],
+      "optional_inputs": [
+        "output_dir",
+        "run_id",
+        "chain_count",
+        "device",
+        "gpu",
+        "use_gpu",
+        "weights_path",
+        "model_dir"
+      ],
+      "primary_outputs": [
+        "atomic_model"
+      ],
+      "required_dependencies": [
+        "model_angelo_executable"
+      ],
+      "required_inputs": [
+        "map_path",
+        "sequence_path"
+      ],
+      "supports_af3_prior": false,
+      "supports_consensus_pose": false,
+      "supports_gpu": true,
+      "supports_map_input": true,
+      "supports_particle_input": false,
+      "supports_sequence_input": true,
+      "typical_use_case": "General map+sequence structure build",
+      "upstream_assumptions": [
+        "map_path",
+        "sequence_path"
+      ]
+    },
+    "relion_log": {
+      "backend_name": "relion_log",
+      "category": "picking",
+      "execution_mode_supported": [
+        "log_only"
+      ],
+      "fallback_candidates": [],
+      "maturity_level": "legacy",
+      "notes": "Legacy fallback when neural pickers unavailable.",
+      "optional_dependencies": [],
+      "optional_inputs": [],
+      "primary_outputs": [
+        "relion_autopick_logs"
+      ],
+      "required_dependencies": [
+        "relion"
+      ],
+      "required_inputs": [],
+      "supports_af3_prior": false,
+      "supports_consensus_pose": false,
+      "supports_gpu": false,
+      "supports_map_input": false,
+      "supports_particle_input": false,
+      "supports_sequence_input": false,
+      "typical_use_case": "RELION-native autopick/log-only fallback",
+      "upstream_assumptions": [
+        "ctf_completed"
+      ]
+    },
+    "topaz": {
+      "backend_name": "topaz",
+      "category": "picking",
+      "execution_mode_supported": [
+        "real"
+      ],
+      "fallback_candidates": [
+        "relion_log"
+      ],
+      "maturity_level": "real",
+      "notes": "Best when micrographs and diameter are available.",
+      "optional_dependencies": [
+        "topaz_model_path"
+      ],
+      "optional_inputs": [
+        "topaz_executable",
+        "topaz_env_activate",
+        "topaz_model_path",
+        "topaz_threshold",
+        "topaz_num_particles_per_micrograph",
+        "topaz_device",
+        "topaz_train_mode",
+        "use_pretrained_model",
+        "picked_particles_star",
+        "training_particles_star",
+        "ctf_micrographs_star",
+        "input_micrographs_star",
+        "run_id",
+        "micrograph_pixel_size_angstrom",
+        "topaz_output_coords"
+      ],
+      "primary_outputs": [
+        "picked_particles_star",
+        "topaz_output_coords"
+      ],
+      "required_dependencies": [
+        "topaz_executable"
+      ],
+      "required_inputs": [
+        "micrographs_star_path",
+        "particle_diameter_angstrom",
+        "output_dir"
+      ],
+      "supports_af3_prior": false,
+      "supports_consensus_pose": false,
+      "supports_gpu": true,
+      "supports_map_input": false,
+      "supports_particle_input": false,
+      "supports_sequence_input": false,
+      "typical_use_case": "First-line neural particle picking",
+      "upstream_assumptions": [
+        "ctf_completed",
+        "micrographs_star_path"
+      ]
+    }
+  },
+  "environment_snapshot": {
+    "enabled_backends": null,
+    "git_branch": "unknown",
+    "git_commit": "unknown",
+    "git_dirty": null,
+    "hostname": "44e5aac23e05",
+    "platform": "Linux-6.8.0-90-generic-x86_64-with-glibc2.31",
+    "python_version": "3.10.20 (main, Mar 11 2026, 17:46:40) [GCC 14.3.0]",
+    "test_scope": "cryoem_relion_agent/tests"
+  },
+  "previous_run_metadata": {
+    "first_run": false,
+    "previous_git_branch": "unknown",
+    "previous_git_commit": "unknown",
+    "previous_run_id": "bench_20260416T210847507356Z_04339c",
+    "previous_timestamp": "2026-04-16T21:08:47.507700+00:00"
+  },
+  "regression_summary": {
+    "first_run": false,
+    "improved_cases": [],
+    "missing_previous_cases": [],
+    "new_cases": [],
+    "newly_blocked_cases": [],
+    "newly_completed_cases": [],
+    "regressed_cases": [],
+    "removed_cases": [],
+    "unchanged_cases": [
+      "cryoppp_topaz_smoke_10005"
+    ]
+  },
+  "run_metadata": {
+    "benchmark_count": 1,
+    "benchmark_root": "/root/share/szs/CryoAgent/cryoem_relion_agent/.cryoem_agent/benchmarks",
+    "blocked_count": 0,
+    "completed_count": 0,
+    "dry_run": false,
+    "failed_count": 1,
+    "run_id": "bench_20260416T212017251779Z_20ddc3",
+    "timestamp": "2026-04-16T21:20:17.252491+00:00",
+    "working_directory": "/root/share/szs/CryoAgent/cryoem_relion_agent"
+  },
+  "selection_snapshot": {}
+}

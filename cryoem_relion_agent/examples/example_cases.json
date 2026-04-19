@@ -1,0 +1,30 @@
+[
+  {
+    "case_id": "case_001",
+    "project_id": "rln_spike_001",
+    "sample_type": "protein",
+    "n_micrographs": 2400,
+    "n_particles_after_2d": 310000,
+    "estimated_resolution": 3.2,
+    "orientation_warning": false,
+    "heterogeneity_warning": false,
+    "chosen_model_builder": "run_mica",
+    "final_status": "completed",
+    "notes": "Good particle distribution and clear high-resolution map.",
+    "created_at": "2026-03-01T10:10:00+00:00"
+  },
+  {
+    "case_id": "case_002",
+    "project_id": "rln_complex_009",
+    "sample_type": "complex",
+    "n_micrographs": 1900,
+    "n_particles_after_2d": 120000,
+    "estimated_resolution": 4.1,
+    "orientation_warning": true,
+    "heterogeneity_warning": true,
+    "chosen_model_builder": null,
+    "final_status": "human_review",
+    "notes": "Strong heterogeneity warning; manual branching required.",
+    "created_at": "2026-03-08T06:30:00+00:00"
+  }
+]

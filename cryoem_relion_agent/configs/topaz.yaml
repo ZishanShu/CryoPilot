@@ -1,0 +1,10 @@
+# Optional Topaz picking defaults (merged with action parameters; policy wins).
+# Executable: null means resolve via PATH ``topaz`` after explicit ``topaz_executable`` on the action.
+
+topaz_executable: null
+default_model: resnet16
+default_threshold: -6
+default_device: CPU
+default_particle_diameter_angstrom: 180
+micrograph_pixel_size_angstrom: null
+topaz_env_activate: null

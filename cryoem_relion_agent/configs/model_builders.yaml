@@ -1,0 +1,14 @@
+# ModelAngelo CLI (see upstream README: model_angelo build -v MAP -pf FASTA -o OUT)
+# Use an absolute path so the agent does not rely on conda activate / PATH for model_angelo.
+model_angelo:
+  executable: "/root/anaconda3/envs/model_angelo/bin/model_angelo"
+  torch_home: "/root/share/szs/CryoAgent/model-angelo/public/model_angelo_weights"
+  weights_relpath: "hub/checkpoints/model_angelo_v1.0"
+  subcommand_with_seq:
+    - build
+  flags:
+    map: "-v"
+    protein_fasta: "-pf"
+    output: "-o"
+  # Relative to project_root/.cryoem_agent/
+  output_runs_subdir: modelangelo_runs

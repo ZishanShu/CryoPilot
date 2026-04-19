@@ -1,0 +1,20 @@
+{
+  "project_id": "demo_relion_project",
+  "project_path": "/data/relion/demo_relion_project",
+  "stage": "Class2D",
+  "status": "running",
+  "last_action": "run_class2d_cleanup",
+  "n_micrographs": 3200,
+  "n_particles_picked": 1800000,
+  "n_particles_after_2d": 420000,
+  "n_particles_after_3d": 0,
+  "estimated_resolution": null,
+  "orientation_warning": false,
+  "heterogeneity_warning": false,
+  "map_path": null,
+  "sequence_path": "/data/relion/demo_relion_project/sequence.fasta",
+  "notes": [
+    "Example state for documentation and local testing."
+  ],
+  "updated_at": "2026-04-08T08:00:00+00:00"
+}

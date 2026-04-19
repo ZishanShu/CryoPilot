@@ -1,0 +1,49 @@
+# Python / 工具缓存
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+*.log
+*.sqlite
+*.sqlite3
+
+# 大型数据集与教程（勿提交到 GitHub）
+cryoppp/archives/
+cryoppp/extracted/
+cryoppp/download_logs/
+Tutorial5.0/
+smoke_projects/
+relion30_tutorial/
+cryoppp_lite/cryoppp_lite/
+real_runs/
+
+# 模型权重与大型资源
+model-angelo/model_angelo_weights/
+model-angelo/public/
+EModelX/models/
+EModelX/data/
+MICA/modules/merizo/weights/
+
+# 构建产物
+relion/build/
+**/build/
+dist/
+*.egg-info/
+
+# 本地/临时
+tmp/
+reports/
+.coverage
+htmlcov/
+
+# 根目录大型归档（勿提交）
+*.tar
+*.tar.gz
+*.zip
+
+# 保留嵌套仓库历史备份（见下方说明）
+.git_backup/

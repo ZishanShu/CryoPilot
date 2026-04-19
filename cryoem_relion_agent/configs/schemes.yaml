@@ -1,0 +1,13 @@
+schemes:
+  run_import_preprocess: "echo run_import_preprocess --project {project_path}"
+  run_picking_extract: "echo run_picking_extract --project {project_path}"
+  run_class2d_cleanup: "echo run_class2d_cleanup --project {project_path}"
+  run_initmodel_3dclass: "echo run_initmodel_3dclass --particles {n_particles_after_2d}"
+  run_refine_ctf_polish: "echo run_refine_ctf_polish --project {project_path}"
+  run_postprocess: "echo run_postprocess --project {project_path}"
+  run_validation: "echo run_validation --map {map_path} --res {current_resolution}"
+  run_modelangelo: "echo run_modelangelo --map {map_path} --seq {sequence_path}"
+  run_emodelx: "echo run_emodelx --map {map_path} --chains {chain_count}"
+  run_mica: "echo run_mica --map {map_path} --seq {sequence_path}"
+  request_human_review: "echo request_human_review"
+  stop_pipeline: "echo stop_pipeline"

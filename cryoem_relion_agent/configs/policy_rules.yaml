@@ -1,0 +1,39 @@
+thresholds:
+  min_particles_for_3d: 50000
+  min_retain_ratio_2d: 0.2
+  target_resolution_for_modeling: 4.0
+
+priorities:
+  request_human_review: 95
+  run_cryodrgn: 94
+  run_autopick: 78
+  run_extract: 74
+  run_class2d: 71
+  run_import_preprocess: 80
+  run_picking_extract: 75
+  run_class2d_cleanup: 70
+  run_init3d_or_class3d: 66
+  run_initmodel_3dclass: 65
+  run_refine3d: 62
+  run_ctf_refine: 61
+  run_polish: 60
+  run_postprocess: 59
+  run_refine_ctf_polish: 60
+  run_modelangelo: 58
+  run_validation: 55
+  stop_pipeline: 10
+
+picking:
+  default_backend: relion_log
+  allowed_backends: [relion_log, topaz, cryolo]
+  project_overrides: {}
+
+heterogeneity:
+  default_backend: human_review
+  allowed_backends: [human_review, cryodrgn]
+  project_overrides: {}
+
+model_building:
+  default_backend: modelangelo
+  allowed_backends: [modelangelo, emodelx, mica]
+  project_overrides: {}

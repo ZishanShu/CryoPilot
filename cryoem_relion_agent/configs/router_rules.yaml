@@ -1,0 +1,8 @@
+thresholds:
+  mica_resolution_max: 3.5
+
+priorities:
+  run_mica: 90
+  run_emodelx: 80
+  run_modelangelo: 70
+  request_human_review: 95

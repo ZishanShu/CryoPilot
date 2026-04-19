@@ -1,0 +1,20 @@
+{
+  "project_id": "fake_relion_project",
+  "project_path": "/root/share/szs/CryoAgent/cryoem_relion_agent/demo_workspace/fake_relion_project",
+  "stage": "Refine3D",
+  "status": "running",
+  "last_action": null,
+  "n_micrographs": 2,
+  "n_particles_picked": 5,
+  "n_particles_after_2d": 1,
+  "n_particles_after_3d": 0,
+  "estimated_resolution": 3.8,
+  "orientation_warning": false,
+  "heterogeneity_warning": false,
+  "map_path": "/root/share/szs/CryoAgent/cryoem_relion_agent/demo_workspace/fake_relion_project/Refine3D/job008/refined_map.mrc",
+  "sequence_path": null,
+  "notes": [
+    "Project scan completed with conservative heuristics."
+  ],
+  "updated_at": "2026-04-07T21:02:57.813101Z"
+}
