@@ -1,0 +1,22 @@
+# Baseline 3: registry/policy routing + LLM supervision at every stop point.
+protocol_name: llm_supervised_agent
+protocol_kind: llm_supervised_agent
+allowed_backends:
+  - topaz
+  - cryodrgn
+  - modelangelo
+  - emodelx
+  - mica
+routing_mode: rule_with_llm
+llm_supervision_enabled: true
+fallback_policy: router
+stop_points:
+  - preflight
+  - execution
+  - evaluation
+  - diff
+success_criteria:
+  require_non_empty_output: true
+recovery_policy:
+  retry_on_transient_error: true
+notes: LLM-supervised agent; collects supervision payloads at key gates.

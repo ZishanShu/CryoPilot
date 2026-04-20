@@ -1,0 +1,18 @@
+# F2: Topaz executable missing; preflight should block.
+case_id: F2_topaz_preflight_blocked_missing_executable
+case_type: workflow_case
+dataset_name: cryoppp_lite
+dataset_root: ${DATA_ROOT}/cryoppp_lite
+input_state:
+  stage: picking
+  expected_failure_phase: preflight
+  expected_failure_kind: preflight_blocked
+  expected_root_cause_guess: missing_model_or_dependency
+available_inputs:
+  micrographs_star: ${RUN_ROOT}/F2/micrographs.star
+  topaz_executable_present: false
+target_stage: picking
+evaluation_mode: none
+notes: >-
+  Registry entry for preflight-blocked Topaz run. Topaz CLI is absent so the
+  preflight should reject execution and advice should point to dependency fix.

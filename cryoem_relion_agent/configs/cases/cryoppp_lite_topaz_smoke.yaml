@@ -1,0 +1,12 @@
+# Workflow case: CryoPPP_Lite Topaz smoke run (currently a known-failure case).
+case_id: cryoppp_lite_topaz_smoke
+case_type: workflow_case
+dataset_name: cryoppp_lite
+dataset_root: null
+input_state:
+  stage: picking
+available_inputs:
+  micrographs_star: false
+target_stage: picking
+evaluation_mode: picking_coords
+notes: Known-failure registry entry for CryoPPP_Lite Topaz path.

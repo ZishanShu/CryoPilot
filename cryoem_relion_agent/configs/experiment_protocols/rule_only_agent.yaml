@@ -1,0 +1,19 @@
+# Baseline 2: registry/policy-routed agent, no LLM.
+protocol_name: rule_only_agent
+protocol_kind: rule_only_agent
+allowed_backends:
+  - topaz
+  - cryodrgn
+  - modelangelo
+  - emodelx
+  - mica
+routing_mode: rule
+llm_supervision_enabled: false
+fallback_policy: registry_default
+stop_points:
+  - preflight
+success_criteria:
+  require_non_empty_output: true
+recovery_policy:
+  retry_on_transient_error: false
+notes: Rule-only agent baseline; rerouting via registry/policy only.
