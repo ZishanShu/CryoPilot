@@ -165,9 +165,11 @@ def build_benchmark_case(
             "protocol_name": protocol.protocol_name,
             "case_id": case.case_id,
             "dataset_name": case.dataset_name,
+            "dataset_root": case.dataset_root,
             "target_stage": case.target_stage,
             "evaluation_mode": case.evaluation_mode,
             "selection_decision": sel,
+            "materialized_case": case.to_dict(),
         },
     }
 

@@ -1,0 +1,19 @@
+# F3: Topaz returns zero exit code but picks.star is header-only / empty.
+case_id: F3_topaz_empty_output_case
+case_type: workflow_case
+dataset_name: cryoppp_lite
+dataset_root: ${DATA_ROOT}/cryoppp_lite
+input_state:
+  stage: picking
+  expected_failure_phase: execution
+  expected_failure_kind: empty_output_failure
+  expected_root_cause_guess: unknown
+available_inputs:
+  micrographs_star: ${RUN_ROOT}/F3/micrographs.star
+  synthetic_empty_output: ${RUN_ROOT}/F3/empty_picks.star
+target_stage: picking
+evaluation_mode: picking_coords
+notes: >-
+  Registry entry for an execution path where return_code is 0 but the
+  resulting picks.star has zero particles. Used to validate empty-output
+  detection + suggested tightening of the non_empty_output check.

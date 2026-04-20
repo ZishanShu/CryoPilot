@@ -1,0 +1,22 @@
+# F4: MICA selected but af3_dir missing; expect preflight-blocked / unavailable
+# and advice should suggest falling back to EModelX / ModelAngelo.
+case_id: F4_mica_unavailable_missing_af3_dir
+case_type: map_level_case
+dataset_name: real_mid3d_project
+dataset_root: ${DATA_ROOT}/real_mid3d_project
+input_state:
+  has_map: true
+  has_sequence: true
+  expected_failure_phase: preflight
+  expected_failure_kind: preflight_blocked
+  expected_root_cause_guess: missing_model_or_dependency
+  af3_dir_present: false
+available_inputs:
+  map_path: ${CASE_ROOT}/map.mrc
+  sequence_path: ${CASE_ROOT}/sequence.fasta
+  af3_dir: null
+target_stage: model_building
+evaluation_mode: success_only
+notes: >-
+  MICA requires af3_dir; when absent, registry + advice should steer to
+  EModelX or ModelAngelo.

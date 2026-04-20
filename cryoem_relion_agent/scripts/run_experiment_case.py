@@ -16,6 +16,16 @@ Usage examples:
       --protocol rule_only_agent \\
       --case configs/cases/cryoppp_lite_topaz_smoke.yaml \\
       --output-dir real_runs/baselines/rule_only
+
+  # Server-ready run with path variable overrides (paths in the case YAML can
+  # reference ${PROJECT_ROOT}, ${DATA_ROOT}, ${RUN_ROOT}, ${CASE_ROOT})
+  python -m scripts.run_experiment_case \\
+      --project-root /srv/cryoagent \\
+      --data-root /srv/data \\
+      --run-root /srv/runs \\
+      --case-root /srv/cases \\
+      --protocol rule_only_agent \\
+      --case F1_cryoppp_lite_topaz_input_format_failure
 """
 
 from __future__ import annotations
@@ -26,7 +36,11 @@ from pathlib import Path
 
 from agent.baseline_runner import run_experiment_case
 from agent.benchmark_harness import BenchmarkHarness
-from agent.case_registry import resolve_case
+from agent.case_registry import (
+    CaseMaterializationError,
+    materialize_case,
+    resolve_case,
+)
 from agent.experiment_protocol import resolve_protocol
 from app.scheduler import Scheduler
 
@@ -60,6 +74,36 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip writing success_audit / failure_audit.",
     )
+    p.add_argument(
+        "--data-root",
+        type=Path,
+        default=None,
+        help="Expands ${DATA_ROOT} in case configs.",
+    )
+    p.add_argument(
+        "--run-root",
+        type=Path,
+        default=None,
+        help="Expands ${RUN_ROOT} in case configs.",
+    )
+    p.add_argument(
+        "--case-root",
+        type=Path,
+        default=None,
+        help="Expands ${CASE_ROOT} in case configs.",
+    )
+    p.add_argument(
+        "--var",
+        action="append",
+        default=None,
+        metavar="NAME=VALUE",
+        help="Extra variable binding for case materialization (repeatable).",
+    )
+    p.add_argument(
+        "--allow-env-vars",
+        action="store_true",
+        help="Also read PROJECT_ROOT/DATA_ROOT/RUN_ROOT/CASE_ROOT from env.",
+    )
     return p
 
 
@@ -77,6 +121,22 @@ def _default_case_dirs(project_root: Path) -> list[Path]:
     ]
 
 
+def _build_variables(args: argparse.Namespace, project_root: Path) -> dict[str, str]:
+    variables: dict[str, str] = {"PROJECT_ROOT": str(project_root)}
+    if args.data_root is not None:
+        variables["DATA_ROOT"] = str(Path(args.data_root).resolve())
+    if args.run_root is not None:
+        variables["RUN_ROOT"] = str(Path(args.run_root).resolve())
+    if args.case_root is not None:
+        variables["CASE_ROOT"] = str(Path(args.case_root).resolve())
+    for pair in args.var or []:
+        if "=" not in pair:
+            raise ValueError(f"--var expects NAME=VALUE, got {pair!r}")
+        name, value = pair.split("=", 1)
+        variables[name.strip()] = value.strip()
+    return variables
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     project_root = Path(args.project_root).resolve()
@@ -85,7 +145,16 @@ def main(argv: list[str] | None = None) -> int:
     case_search_dirs = [Path(d) for d in (args.case_dir or [])] + _default_case_dirs(project_root)
 
     protocol = resolve_protocol(args.protocol, search_dirs=protocol_search_dirs)
-    case = resolve_case(args.case, search_dirs=case_search_dirs)
+    raw_case = resolve_case(args.case, search_dirs=case_search_dirs)
+    variables = _build_variables(args, project_root)
+    try:
+        case = materialize_case(
+            raw_case,
+            variables=variables,
+            include_env=bool(args.allow_env_vars),
+        )
+    except CaseMaterializationError as exc:
+        raise SystemExit(f"case materialization failed: {exc}")
 
     scheduler = Scheduler(project_root=project_root)
     harness = BenchmarkHarness(executor=scheduler.action_executor, project_root=project_root)

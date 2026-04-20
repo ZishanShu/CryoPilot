@@ -1,0 +1,19 @@
+# F1: real failure — CryoPPP_Lite + Topaz; preflight ok; real exec; input-format
+# incompatibility at runtime.
+case_id: F1_cryoppp_lite_topaz_input_format_failure
+case_type: workflow_case
+dataset_name: cryoppp_lite
+dataset_root: ${DATA_ROOT}/cryoppp_lite
+input_state:
+  stage: picking
+  expected_failure_phase: execution
+  expected_failure_kind: backend_runtime_error
+  expected_root_cause_guess: input_format_incompatibility
+available_inputs:
+  micrographs_star: ${RUN_ROOT}/F1/micrographs.star
+  project_root: ${PROJECT_ROOT}
+target_stage: picking
+evaluation_mode: picking_coords
+notes: >-
+  Known-failure registry entry. Preflight passes, Topaz real execution is
+  reached, then fails on PngImageFile / shape attribute error.
