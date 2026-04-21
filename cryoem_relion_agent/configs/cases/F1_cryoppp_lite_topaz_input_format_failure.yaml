@@ -1,5 +1,9 @@
-# F1: real failure — CryoPPP_Lite + Topaz; preflight ok; real exec; input-format
-# incompatibility at runtime.
+# F1: real failure -- CryoPPP_Lite + Topaz; preflight ok; real exec; input-format
+# incompatibility at runtime.  ${RUN_ROOT}/F1 is expected to contain a
+# micrographs.star describing one or more micrograph files in a format Topaz
+# cannot parse (e.g. .png).  When Topaz is installed and reachable on PATH this
+# reaches execution and fails with the real stderr; tests can override
+# topaz_executable via an input_state entry to exercise the same code path.
 case_id: F1_cryoppp_lite_topaz_input_format_failure
 case_type: workflow_case
 dataset_name: cryoppp_lite
@@ -11,6 +15,8 @@ input_state:
   expected_root_cause_guess: input_format_incompatibility
 available_inputs:
   micrographs_star: ${RUN_ROOT}/F1/micrographs.star
+  particle_diameter_angstrom: 200
+  output_dir: ${RUN_ROOT}/F1/picks
   project_root: ${PROJECT_ROOT}
 target_stage: picking
 evaluation_mode: picking_coords

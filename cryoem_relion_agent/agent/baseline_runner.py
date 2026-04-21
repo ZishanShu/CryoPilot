@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Mapping, Optional
 from agent.backend_registry import get_backend_capability_matrix
 from agent.benchmark_harness import BenchmarkHarness
 from agent.benchmark_persistence import load_latest_benchmark, persist_benchmark_run
+from agent.case_input_mapping import map_case_inputs_to_backend_params
 from agent.case_registry import ExperimentCase
 from agent.experiment_protocol import ExperimentProtocol
 
@@ -127,10 +128,26 @@ def _merge_inputs(
     case: ExperimentCase,
     selection: Mapping[str, Any],
 ) -> Dict[str, Any]:
-    """Merge case.input_state with routing hints for the benchmark harness."""
+    """Merge case.input_state + mapped available_inputs with routing hints.
+
+    ``case.available_inputs`` uses experiment-layer semantic field names (e.g.
+    ``micrographs_star``).  ``agent.case_input_mapping`` translates those to the
+    backend input contract (e.g. ``micrographs_star_path``) so Topaz preflight
+    and executor receive the fields they require.  Same-name contract keys
+    already present in ``case.input_state`` win over the mapped values.
+    """
     backend = str(selection.get("selected_backend") or "")
     category = str(selection.get("category") or "")
     inputs: Dict[str, Any] = dict(case.input_state or {})
+
+    if backend:
+        mapped = map_case_inputs_to_backend_params(
+            available_inputs=case.available_inputs or {},
+            backend=backend,
+        )
+        for key, value in mapped.items():
+            inputs.setdefault(key, value)
+
     if category == "picking":
         inputs.setdefault("picking_backend", backend)
     elif category == "heterogeneity":
@@ -172,6 +189,75 @@ def build_benchmark_case(
             "materialized_case": case.to_dict(),
         },
     }
+
+
+def _tail(text: Any, *, max_chars: int = 1200) -> Optional[str]:
+    if text is None:
+        return None
+    s = str(text)
+    if len(s) <= max_chars:
+        return s
+    return s[-max_chars:]
+
+
+def _default_supervision_payload(
+    stop_point: str,
+    *,
+    case: ExperimentCase,
+    case_result: Mapping[str, Any],
+    selection: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Build a JSON-friendly supervision snapshot for a stop_point.
+
+    Consumers (rule_only + llm advice builders, failure audit, future real LLM
+    call) need a single consistent shape regardless of whether the case passed
+    preflight or failed at execution.
+    """
+    preflight = case_result.get("preflight") if isinstance(case_result.get("preflight"), Mapping) else {}
+    preflight = dict(preflight or {})
+    base = {
+        "case_id": case.case_id,
+        "backend": case_result.get("backend") or selection.get("selected_backend"),
+        "category": case_result.get("category") or selection.get("category"),
+        "target_stage": case.target_stage,
+    }
+    if stop_point == "preflight":
+        return {
+            **base,
+            "available": preflight.get("available"),
+            "execution_mode": preflight.get("execution_mode"),
+            "blocked_reason": preflight.get("blocked_reason"),
+            "missing_inputs": list(preflight.get("missing_inputs") or []),
+            "missing_input_paths": list(preflight.get("missing_input_paths") or []),
+            "missing_dependencies": list(preflight.get("missing_dependencies") or []),
+        }
+    if stop_point == "execution":
+        return {
+            **base,
+            "status": case_result.get("status"),
+            "execution_mode": case_result.get("execution_mode"),
+            "command": case_result.get("command"),
+            "return_code": case_result.get("return_code"),
+            "stdout_tail": _tail(case_result.get("stdout")),
+            "stderr_tail": _tail(case_result.get("stderr")),
+        }
+    if stop_point == "evaluation":
+        return {
+            **base,
+            "status": case_result.get("status"),
+            "artifacts": list(case_result.get("artifacts") or []),
+            "expected_artifacts": list(case_result.get("expected_artifacts") or []),
+            "generated_paths": list(case_result.get("generated_paths") or []),
+        }
+    if stop_point == "diff":
+        return {
+            **base,
+            "benchmark_id": case_result.get("benchmark_id"),
+            "status": case_result.get("status"),
+            "generated_paths": list(case_result.get("generated_paths") or []),
+            "expected_artifacts": list(case_result.get("expected_artifacts") or []),
+        }
+    return {**base, "stop_point": stop_point}
 
 
 def _derive_stage_reached(
@@ -326,9 +412,18 @@ def run_experiment_case(
 
     supervision: Dict[str, Any] = {}
     if protocol.llm_supervision_enabled:
-        payloads = dict(extra.get("llm_supervision_payloads") or {})
+        payloads_from_extra = dict(extra.get("llm_supervision_payloads") or {})
         for sp in protocol.stop_points:
-            supervision.setdefault(sp, payloads.get(sp))
+            override = payloads_from_extra.get(sp)
+            if override is not None:
+                supervision[sp] = override
+            else:
+                supervision[sp] = _default_supervision_payload(
+                    sp,
+                    case=case,
+                    case_result=case_result,
+                    selection=selection,
+                )
 
     result = ExperimentResult(
         protocol_name=protocol.protocol_name,
