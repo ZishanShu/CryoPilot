@@ -98,12 +98,13 @@ def preflight_topaz_pick(
 
     mg_path, mg_key = effective_micrographs_star(params)
     missing: List[str] = []
+    missing_input_paths: List[str] = []
     if not mg_path:
         missing.append("micrographs_star_path")
     else:
         mp = Path(mg_path)
         if not mp.is_file():
-            missing.append("micrographs_star_path")
+            missing_input_paths.append("micrographs_star_path")
 
     dia = params.get("particle_diameter_angstrom")
     if dia is None:
@@ -129,15 +130,17 @@ def preflight_topaz_pick(
     missing_deps: List[str] = []
     exe_resolved: Optional[str] = None
     exe_err: Optional[str] = None
-    if not missing:
+    if not missing and not missing_input_paths:
         exe_resolved, exe_err = resolve_topaz_executable(params, config)
         if not exe_resolved:
             missing_deps.append("topaz_executable")
 
-    if missing or missing_deps:
+    if missing or missing_input_paths or missing_deps:
         blocked_parts: List[str] = []
         if missing:
             blocked_parts.append(f"missing_required_inputs: {','.join(missing)}")
+        if missing_input_paths:
+            blocked_parts.append(f"input_path_not_found: {','.join(missing_input_paths)}")
         if missing_deps:
             blocked_parts.append(exe_err or "missing_dependency: topaz_executable")
         blocked = "; ".join(blocked_parts) if blocked_parts else "unavailable"
@@ -149,6 +152,7 @@ def preflight_topaz_pick(
             "command_mode": "extract",
             "model_source": model_source,
             "missing_inputs": missing,
+            "missing_input_paths": missing_input_paths,
             "missing_dependencies": missing_deps,
             "warnings": warnings,
             "blocked_reason": blocked,
@@ -166,6 +170,7 @@ def preflight_topaz_pick(
         "command_mode": "extract",
         "model_source": model_source,
         "missing_inputs": [],
+        "missing_input_paths": [],
         "missing_dependencies": [],
         "warnings": warnings,
         "blocked_reason": None,
@@ -202,5 +207,6 @@ def enrich_and_preflight_topaz_params(
     p["picking_execution_mode"] = str(pf.get("execution_mode") or "unavailable")
     p["picking_blocked_reason"] = pf.get("blocked_reason") or ""
     p["picking_missing_inputs"] = list(pf.get("missing_inputs") or [])
+    p["picking_missing_input_paths"] = list(pf.get("missing_input_paths") or [])
     p["picking_missing_dependencies"] = list(pf.get("missing_dependencies") or [])
     return p

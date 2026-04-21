@@ -53,6 +53,7 @@ def _merge_picking_preflight_fields(out: Dict[str, Any], action: Action) -> None
         "picking_execution_mode",
         "picking_blocked_reason",
         "picking_missing_inputs",
+        "picking_missing_input_paths",
         "picking_missing_dependencies",
     ):
         if k in action.parameters and action.parameters[k] not in (None, "", []):
