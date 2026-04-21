@@ -66,6 +66,7 @@ def _build_f1_case(
             "micrographs_star": str(micrographs_star),
             "particle_diameter_angstrom": 200,
             "output_dir": str(output_dir),
+            "topaz_device": 0,
         },
         target_stage="picking",
         evaluation_mode="picking_coords",
@@ -150,6 +151,10 @@ class TestF1ReachesExecution(unittest.TestCase):
             self.assertNotEqual(cr.get("return_code"), None)
             self.assertEqual(cr.get("return_code"), 1)
             self.assertIn("PngImageFile", str(cr.get("stderr") or ""))
+            # Regression: device must be normalized to int before topaz sees
+            # it; no "invalid int value: 'CPU'" argparse error anywhere.
+            self.assertNotIn("invalid int value", str(cr.get("stderr") or ""))
+            self.assertIn("-d 0", str(cr.get("command") or ""))
 
             pf = cr.get("preflight") or {}
             self.assertTrue(pf.get("available"))
@@ -161,6 +166,9 @@ class TestF1ReachesExecution(unittest.TestCase):
             cls = audit.get("failure_classification") or {}
             self.assertEqual(cls.get("failure_phase"), "execution")
             self.assertEqual(cls.get("failure_kind"), "backend_runtime_error")
+            self.assertEqual(
+                cls.get("root_cause_guess"), "input_format_incompatibility"
+            )
 
     def test_llm_supervised_agent_collects_non_null_payloads(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -201,6 +209,10 @@ class TestF1ReachesExecution(unittest.TestCase):
             self.assertIsNotNone(sup["execution"].get("command"))
             self.assertEqual(sup["execution"].get("return_code"), 1)
             self.assertIn("PngImageFile", str(sup["execution"].get("stderr_tail") or ""))
+            self.assertNotIn(
+                "invalid int value",
+                str(sup["execution"].get("stderr_tail") or ""),
+            )
 
 
 class TestF1FixtureMappingSanity(unittest.TestCase):
