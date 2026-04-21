@@ -25,6 +25,59 @@ def _argv_to_command(argv: Sequence[str]) -> str:
     return " ".join(shlex.quote(str(a)) for a in argv)
 
 
+class TopazDeviceValueError(ValueError):
+    """Raised when a topaz_device value cannot be normalized to int / None."""
+
+
+def normalize_topaz_device(value: Any) -> Optional[int]:
+    """Normalize a topaz_device value to an ``int`` GPU index or ``None`` for CPU.
+
+    Topaz ``extract``'s ``-d/--device`` flag in current versions expects an
+    integer GPU index; passing a string like ``"CPU"`` causes argparse to bail
+    with ``invalid int value``.  Callers should:
+
+    * pass ``int`` (e.g. ``0``) for an explicit GPU index,
+    * pass ``None`` / ``""`` / ``"cpu"`` / ``"CPU"`` to request CPU execution,
+      in which case this helper returns ``None`` and the caller must OMIT the
+      ``-d`` flag entirely,
+    * pass a numeric string (``"0"``, ``"1"``) which is coerced to ``int``.
+
+    Any other non-empty string raises :class:`TopazDeviceValueError` so we
+    never silently drop a value the user set intentionally.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        # bool is a subclass of int; treat as an invalid device specifier so
+        # a yaml ``true``/``false`` does not silently become device 0 or 1.
+        raise TopazDeviceValueError(
+            f"topaz_device must be an int or string, got bool {value!r}"
+        )
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if value.is_integer():
+            return int(value)
+        raise TopazDeviceValueError(
+            f"topaz_device float must be integral, got {value!r}"
+        )
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        if stripped.lower() == "cpu":
+            return None
+        try:
+            return int(stripped)
+        except ValueError as exc:
+            raise TopazDeviceValueError(
+                f"topaz_device string must be 'cpu' or an int, got {value!r}"
+            ) from exc
+    raise TopazDeviceValueError(
+        f"topaz_device must be int, None, or string; got {type(value).__name__}"
+    )
+
+
 def _resolve_micrograph_paths_from_star(star_path: Path) -> List[str]:
     """Extract micrograph file paths from a STAR file."""
     text = star_path.read_text(encoding="utf-8", errors="ignore")
@@ -119,8 +172,11 @@ def build_topaz_extract_argv(
     if thr is not None:
         argv.extend(["-t", str(thr)])
 
-    dev = params.get("topaz_device") or config.get("default_device")
-    if dev:
+    dev_raw = params.get("topaz_device")
+    if dev_raw is None or (isinstance(dev_raw, str) and not dev_raw.strip()):
+        dev_raw = config.get("default_device")
+    dev = normalize_topaz_device(dev_raw)
+    if dev is not None:
         argv.extend(["-d", str(dev)])
     argv.extend(["--format", "star", "-o", out_coords])
     argv.extend(micrograph_paths)

@@ -17,6 +17,7 @@ available_inputs:
   micrographs_star: ${RUN_ROOT}/F1/micrographs.star
   particle_diameter_angstrom: 200
   output_dir: ${RUN_ROOT}/F1/picks
+  topaz_device: 0
   project_root: ${PROJECT_ROOT}
 target_stage: picking
 evaluation_mode: picking_coords
