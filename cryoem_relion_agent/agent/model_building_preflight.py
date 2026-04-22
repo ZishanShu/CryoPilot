@@ -103,8 +103,24 @@ def preflight_model_building(
         effective.setdefault(k, v)
 
     required: tuple[str, ...] = tuple(spec["required_fields"])
+
+    # Protocol-aware skip-list (generic layer).  EModelX's ``seq_free`` is a
+    # native map-only protocol and never reads a FASTA, so we must not
+    # advertise ``sequence_path`` as a schema-required field for it.
+    skip_required: Set[str] = set()
+    if bid == "emodelx":
+        _emodelx_protocol_early = str(
+            effective.get("emodelx_protocol")
+            or spec.get("defaults", {}).get("emodelx_protocol")
+            or "temp_free"
+        ).strip()
+        if _emodelx_protocol_early == "seq_free":
+            skip_required.add("sequence_path")
+
     missing: List[str] = []
     for field in required:
+        if field in skip_required:
+            continue
         if field == "af3_dir":
             if _effective_af3_dir(effective) is None:
                 missing.append("af3_dir")
@@ -187,8 +203,15 @@ def preflight_model_building(
 
         if not _field_present(effective, "map_path") or not Path(str(effective.get("map_path"))).is_file():
             missing.append("map_path")
-        if not _field_present(effective, "sequence_path") or not Path(str(effective.get("sequence_path"))).is_file():
-            missing.append("sequence_path")
+        # Protocol-aware sequence_path validation. ``seq_free`` is a native
+        # EModelX mode that builds a Cα-only model from density alone and
+        # does NOT accept ``--fasta``; requiring it here would wrongly block
+        # legitimate map-only cases.
+        if protocol != "seq_free":
+            if not _field_present(effective, "sequence_path") or not Path(
+                str(effective.get("sequence_path"))
+            ).is_file():
+                missing.append("sequence_path")
 
         out_dir = Path(str(effective.get("output_dir")).strip())
         try:
@@ -223,6 +246,26 @@ def preflight_model_building(
             if not has_dl and not has_tpl:
                 missing.append("template_dir_or_download_afdb")
 
+        def _build_cmd_hint() -> Optional[str]:
+            if not (py_path and run_py_path):
+                return None
+            parts = [
+                str(py_path),
+                str(run_py_path),
+                "--protocol",
+                protocol,
+                "--EM_map",
+                str(effective.get("map_path")),
+            ]
+            if protocol != "seq_free" and effective.get("sequence_path"):
+                parts.extend(["--fasta", str(effective.get("sequence_path"))])
+            if protocol == "temp_flex" and effective.get("template_dir"):
+                parts.extend(["--template_dir", str(effective.get("template_dir"))])
+            parts.extend(["--output_dir", str(out_dir)])
+            return " ".join(parts)
+
+        seq_for_summary = effective.get("sequence_path") if protocol != "seq_free" else None
+
         if missing or missing_deps:
             blocked_chunks: List[str] = []
             if missing:
@@ -252,22 +295,17 @@ def preflight_model_building(
                 "weights_dir": str(weights_dir) if weights_dir else None,
                 "protocol": protocol,
                 "resolution": effective.get("resolution") if effective.get("resolution") is not None else cfg.get("emodelx_default_resolution"),
-                "command": (
-                    f"{py_path} {run_py_path} --protocol {protocol} --EM_map {effective.get('map_path')} "
-                    f"--fasta {effective.get('sequence_path')} --output_dir {out_dir}"
-                )
-                if py_path and run_py_path
-                else None,
+                "command": _build_cmd_hint(),
                 "output_path": str(out_dir),
                 "input_summary": (
                     f"protocol={protocol}, repo={repo_path}, "
-                    f"map={effective.get('map_path')}, sequence={effective.get('sequence_path')}, output_dir={out_dir}"
+                    f"map={effective.get('map_path')}, sequence={seq_for_summary}, output_dir={out_dir}"
                 ),
             }
 
         input_summary = (
             f"protocol={protocol}, repo={repo_path}, map={effective.get('map_path')}, "
-            f"sequence={effective.get('sequence_path')}, output_dir={out_dir}"
+            f"sequence={seq_for_summary}, output_dir={out_dir}"
         )
         return {
             "backend_name": bid,
@@ -286,10 +324,7 @@ def preflight_model_building(
             "weights_dir": str(weights_dir) if weights_dir else None,
             "protocol": protocol,
             "resolution": effective.get("resolution") if effective.get("resolution") is not None else cfg.get("emodelx_default_resolution"),
-            "command": (
-                f"{py_path} {run_py_path} --protocol {protocol} --EM_map {effective.get('map_path')} "
-                f"--fasta {effective.get('sequence_path')} --output_dir {out_dir}"
-            ),
+            "command": _build_cmd_hint(),
             "output_path": str(out_dir),
             "input_summary": input_summary,
         }
