@@ -308,37 +308,55 @@ def _build_human_summary_cn(
     return text
 
 
+def _as_dict(value: Any) -> Dict[str, Any]:
+    """Coerce ``value`` to a dict, returning an empty dict for anything else.
+
+    ``failure_audit`` is called on a very wide set of case_result shapes —
+    preflight-blocked topaz, successful-then-empty-output topaz, seq_free
+    EModelX where supervision payloads may be absent, dry-runs that never
+    populated ``smoke_run_checks``, and so on.  Using ``or {}`` is not enough
+    because Python's truthiness returns the value itself when it's a non-dict
+    (e.g. a list / False), and downstream ``.get()`` calls would crash.
+    """
+    return value if isinstance(value, dict) else {}
+
+
 def build_failure_audit(
     latest_payload: Mapping[str, Any],
     smoke_summary: Mapping[str, Any],
 ) -> Dict[str, Any]:
     """Build full failure audit dict from benchmark latest.json and smoke_run_summary.json."""
-    case_result = dict(smoke_summary.get("case_result") or {})
+    case_result = _as_dict(smoke_summary.get("case_result") if isinstance(smoke_summary, Mapping) else None)
+    case_preflight = _as_dict(case_result.get("preflight"))
     benchmark_id = case_result.get("benchmark_id")
-    latest_case = _find_benchmark_result(latest_payload, str(benchmark_id)) if benchmark_id else None
+    latest_payload_map = latest_payload if isinstance(latest_payload, Mapping) else {}
+    latest_case = (
+        _find_benchmark_result(latest_payload_map, str(benchmark_id)) if benchmark_id else None
+    )
+    latest_case_dict = _as_dict(latest_case)
 
-    classification = classify_failure(case_result, latest_payload)
+    classification = classify_failure(case_result, latest_payload_map)
 
-    extra = dict(case_result.get("extra") or {})
-    payloads = dict(extra.get("llm_supervision_payloads") or {})
-    preflight_sup = payloads.get("preflight") or {}
-    run_meta = dict(latest_payload.get("run_metadata") or {})
-    prev_meta = dict(latest_payload.get("previous_run_metadata") or {})
+    extra = _as_dict(case_result.get("extra"))
+    payloads = _as_dict(extra.get("llm_supervision_payloads"))
+    preflight_sup = _as_dict(payloads.get("preflight"))
+    run_meta = _as_dict(latest_payload_map.get("run_metadata"))
+    prev_meta = _as_dict(latest_payload_map.get("previous_run_metadata"))
 
-    diff_from_smoke = smoke_summary.get("llm_diff_regression_payload")
+    diff_from_smoke = smoke_summary.get("llm_diff_regression_payload") if isinstance(smoke_summary, Mapping) else None
     diff_regression: Any
     if isinstance(diff_from_smoke, dict) and diff_from_smoke:
         diff_regression = diff_from_smoke
     else:
         diff_regression = {
-            "regression_summary": latest_payload.get("regression_summary"),
-            "benchmark_diff": latest_payload.get("benchmark_diff"),
+            "regression_summary": latest_payload_map.get("regression_summary"),
+            "benchmark_diff": latest_payload_map.get("benchmark_diff"),
             "run_metadata": run_meta,
             "previous_run_metadata": prev_meta,
         }
 
     dataset_id = extra.get("dataset_id")
-    checks = dict(extra.get("smoke_run_checks") or {})
+    checks = _as_dict(extra.get("smoke_run_checks"))
 
     prev_rid = prev_meta.get("previous_run_id")
     if not prev_rid and isinstance(diff_from_smoke, dict):
@@ -355,14 +373,22 @@ def build_failure_audit(
         "previous_run_id": prev_rid,
     }
 
-    pf_result = preflight_sup.get("preflight_result") or case_result.get("preflight") or {}
-    execution_payload = payloads.get("execution") or {}
+    # pf_result is the authoritative preflight snapshot for this audit:
+    # prefer the supervision payload's ``preflight_result``, then the
+    # case_result's ``preflight`` block.  Both may be missing or non-dict
+    # for non-picking backends (e.g. EModelX seq_free under rule_only_agent)
+    # so we coerce at every step.
+    pf_result = _as_dict(preflight_sup.get("preflight_result")) or case_preflight
+    pf_result = _as_dict(pf_result)
+    execution_payload = _as_dict(payloads.get("execution"))
+    picking_evaluation = _as_dict(extra.get("picking_evaluation"))
 
+    available_fallback = case_preflight.get("available")
     execution_context = {
         "selected_backend": preflight_sup.get("selected_backend") or case_result.get("backend"),
         "selection_reason": preflight_sup.get("selection_reason"),
-        "preflight_available": bool(pf_result.get("available", case_result.get("preflight", {}).get("available"))),
-        "preflight_execution_mode": pf_result.get("execution_mode") or (case_result.get("preflight") or {}).get("execution_mode"),
+        "preflight_available": bool(pf_result.get("available", available_fallback)),
+        "preflight_execution_mode": pf_result.get("execution_mode") or case_preflight.get("execution_mode"),
         "command": case_result.get("command") or execution_payload.get("command"),
         "return_code": case_result.get("return_code"),
         "runtime_seconds": case_result.get("runtime_seconds"),
@@ -370,24 +396,24 @@ def build_failure_audit(
 
     stderr = str(case_result.get("stderr") or "")
     stdout = str(case_result.get("stdout") or "")
-    if latest_case:
-        if not stderr and latest_case.get("blocked_reason"):
-            stderr = str(latest_case.get("blocked_reason") or "")
-        if not case_result.get("command") and latest_case.get("command"):
-            execution_context["command"] = latest_case.get("command")
-        if case_result.get("return_code") is None and latest_case.get("return_code") is not None:
-            execution_context["return_code"] = latest_case.get("return_code")
+    if latest_case_dict:
+        if not stderr and latest_case_dict.get("blocked_reason"):
+            stderr = str(latest_case_dict.get("blocked_reason") or "")
+        if not case_result.get("command") and latest_case_dict.get("command"):
+            execution_context["command"] = latest_case_dict.get("command")
+        if case_result.get("return_code") is None and latest_case_dict.get("return_code") is not None:
+            execution_context["return_code"] = latest_case_dict.get("return_code")
 
     evidence = {
-        "blocked_reason": case_result.get("blocked_reason") or (latest_case or {}).get("blocked_reason"),
+        "blocked_reason": case_result.get("blocked_reason") or latest_case_dict.get("blocked_reason"),
         "stderr_head": _truncate(stderr),
         "stdout_head": _truncate(stdout),
         "artifact_paths": case_result.get("artifacts")
         or case_result.get("generated_paths")
-        or (latest_case or {}).get("artifacts"),
+        or latest_case_dict.get("artifacts"),
         "smoke_run_checks": checks,
-        "picking_evaluation": extra.get("picking_evaluation"),
-        "regression_summary": latest_payload.get("regression_summary"),
+        "picking_evaluation": picking_evaluation or None,
+        "regression_summary": latest_payload_map.get("regression_summary"),
         "key_signals": _build_key_signals(case_result, checks, classification),
     }
 
