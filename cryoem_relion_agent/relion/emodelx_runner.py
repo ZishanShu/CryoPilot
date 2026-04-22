@@ -31,11 +31,14 @@ def run_emodelx_pipeline(
         protocol,
         "--EM_map",
         str(params["map_path"]),
-        "--fasta",
-        str(params["sequence_path"]),
-        "--output_dir",
-        str(output_dir),
     ]
+    # Protocol-aware inputs: seq_free omits --fasta entirely; temp_flex also
+    # forwards --template_dir when the case supplies one.
+    if protocol != "seq_free":
+        cmd.extend(["--fasta", str(params["sequence_path"])])
+    if protocol == "temp_flex" and params.get("template_dir"):
+        cmd.extend(["--template_dir", str(params.get("template_dir"))])
+    cmd.extend(["--output_dir", str(output_dir)])
 
     if bool(params.get("run_pulchra")):
         cmd.extend(["--run_pulchra", "--pulchra_path", str(params.get("pulchra_path"))])
@@ -44,6 +47,10 @@ def run_emodelx_pipeline(
         resolution = _resolve_resolution(params, preflight)
         if resolution is not None:
             cmd.extend(["--resolution", str(resolution)])
+
+    # Ensure output_dir exists before subprocess launch, even when the
+    # benchmark harness or experiment framework has not pre-created it.
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     if dry_run:
         return {
@@ -58,7 +65,6 @@ def run_emodelx_pipeline(
             "artifact_paths": [],
         }
 
-    output_dir.mkdir(parents=True, exist_ok=True)
     before = {str(p) for p in output_dir.rglob("*") if p.exists()}
     proc = subprocess.run(
         cmd,

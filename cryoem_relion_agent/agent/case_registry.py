@@ -276,6 +276,28 @@ def default_cases() -> Dict[str, ExperimentCase]:
                 "notes": "F3 empty-output execution: rc=0 but picks.star is header-only.",
             }
         ),
+        "T1_tutorial5_map_emodelx_stopA": parse_case(
+            {
+                "case_id": "T1_tutorial5_map_emodelx_stopA",
+                "case_type": "map_level_case",
+                "dataset_name": "tutorial5",
+                "dataset_root": None,
+                "input_state": {
+                    "has_map": True,
+                    "has_sequence": False,
+                    "emodelx_protocol": "seq_free",
+                },
+                "available_inputs": {
+                    "map_path": True,
+                    "emodelx_repo_dir": True,
+                    "output_dir": True,
+                    "emodelx_protocol": "seq_free",
+                },
+                "target_stage": "model_building",
+                "evaluation_mode": "success_only",
+                "notes": "Tutorial5 map routed to EModelX seq_free (no sequence).",
+            }
+        ),
         "F4_mica_unavailable_missing_af3_dir": parse_case(
             {
                 "case_id": "F4_mica_unavailable_missing_af3_dir",
