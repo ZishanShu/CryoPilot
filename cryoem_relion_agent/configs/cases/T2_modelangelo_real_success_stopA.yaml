@@ -1,0 +1,21 @@
+# T2: Tutorial5 postprocessed map + Ecoli.fasta -> ModelAngelo build (stop-A).
+# stop-A only verifies that a real ModelAngelo subprocess completed and
+# produced on-disk artifacts (primary .cif / .pdb + any summary-class
+# files).  Evaluation of structural accuracy is out of scope for stop-A.
+case_id: T2_modelangelo_real_success_stopA
+case_type: map_level_case
+dataset_name: tutorial5
+dataset_root: ${DATA_ROOT}/Tutorial5.0
+input_state:
+  has_map: true
+  has_sequence: true
+available_inputs:
+  map_path: ${DATA_ROOT}/Tutorial5.0/PostProcess/job035/postprocess_masked.mrc
+  sequence_path: ${DATA_ROOT}/Tutorial5.0/Ecoli.fasta
+  output_dir: ${RUN_ROOT}/T2_modelangelo_real_success_stopA/output
+target_stage: model_building
+evaluation_mode: success_only
+notes: >-
+  Sequence-guided map-to-model success stop-A.  Runs ``model_angelo build -v MAP
+  -pf FASTA -o OUTPUT_DIR`` and harvests the primary CIF plus any summary /
+  ranking / score files for downstream audit.
