@@ -14,6 +14,37 @@ def _resolve_resolution(params: Dict[str, Any], preflight: Dict[str, Any]) -> An
     return preflight.get("resolution")
 
 
+_EMODELX_ARTIFACT_GLOBS: tuple = (
+    "*.pdb",
+    "*.cif",
+    "time_cost*.csv",
+    "time_cost*.txt",
+)
+
+
+def _harvest_emodelx_artifacts(
+    output_dir: Path,
+    created: List[str],
+) -> List[str]:
+    """Union the before/after diff with known EModelX output file patterns.
+
+    The diff-based ``created`` list is empty when the output_dir was
+    pre-populated (re-runs) or when EModelX overwrites files in place.  Rather
+    than rely solely on the diff, also scan the output_dir for known seq_free
+    / temp_free / temp_flex product patterns — specifically the
+    ``_EModelX(noseq)_ca_model.pdb`` and ``time_cost__EModelX(noseq).csv``
+    that the seq_free protocol emits.  This is additive; no pattern is
+    required for the run to be considered successful.
+    """
+    found = {str(p) for p in (created or [])}
+    if output_dir.is_dir():
+        for pattern in _EMODELX_ARTIFACT_GLOBS:
+            for p in output_dir.rglob(pattern):
+                if p.is_file():
+                    found.add(str(p))
+    return sorted(found)
+
+
 def run_emodelx_pipeline(
     *,
     params: Dict[str, Any],
@@ -75,7 +106,8 @@ def run_emodelx_pipeline(
     )
     after = {str(p) for p in output_dir.rglob("*") if p.exists()}
     created = sorted(after - before)
-    has_artifacts = len(created) > 0 or any(output_dir.iterdir())
+    harvested = _harvest_emodelx_artifacts(output_dir, created)
+    has_artifacts = len(harvested) > 0 or any(output_dir.iterdir())
 
     if proc.returncode != 0:
         return {
@@ -90,7 +122,8 @@ def run_emodelx_pipeline(
             "return_code": int(proc.returncode),
             "stdout": (proc.stdout or "")[-8000:],
             "stderr": (proc.stderr or "")[-8000:],
-            "artifact_paths": created[:200],
+            "artifact_paths": harvested[:200],
+            "generated_paths": harvested[:200],
             "error": "emodelx subprocess failed",
         }
 
@@ -107,7 +140,8 @@ def run_emodelx_pipeline(
             "return_code": int(proc.returncode),
             "stdout": (proc.stdout or "")[-8000:],
             "stderr": (proc.stderr or "")[-8000:],
-            "artifact_paths": created[:200],
+            "artifact_paths": harvested[:200],
+            "generated_paths": harvested[:200],
             "error": "missing_output_artifacts",
         }
 
@@ -123,5 +157,6 @@ def run_emodelx_pipeline(
         "return_code": int(proc.returncode),
         "stdout": (proc.stdout or "")[-8000:],
         "stderr": (proc.stderr or "")[-8000:],
-        "artifact_paths": created[:200],
+        "artifact_paths": harvested[:200],
+        "generated_paths": harvested[:200],
     }

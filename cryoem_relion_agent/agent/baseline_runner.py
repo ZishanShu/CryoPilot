@@ -41,6 +41,23 @@ _REGISTRY_DEFAULTS: Dict[str, str] = {
 }
 
 
+def _case_wants_seq_free(case: ExperimentCase) -> bool:
+    """Return True when a map-level case explicitly lacks a sequence.
+
+    ``modelangelo`` is sequence-guided and always needs ``sequence_path``;
+    ``emodelx`` exposes a native ``seq_free`` protocol that builds a Cα-only
+    model from density alone.  When the case advertises ``has_sequence=false``
+    or pins ``emodelx_protocol=seq_free``, routing must prefer ``emodelx``
+    over the sequence-guided registry default.
+    """
+    state = case.input_state or {}
+    if str(state.get("emodelx_protocol") or "").strip().lower() == "seq_free":
+        return True
+    if state.get("has_sequence") is False:
+        return True
+    return False
+
+
 @dataclass
 class ExperimentResult:
     """JSON-friendly unified result of a single experiment case run."""
@@ -86,6 +103,31 @@ def _select_backend(
             "selection_reason": "protocol.routing_mode=fixed",
             "rejected_backends": [],
             "rejection_reasons": {},
+            "fallback_applied": False,
+            "category": category,
+        }
+
+    # Map-level seq_free routing: prefer emodelx over the sequence-guided
+    # modelangelo default when the case explicitly lacks a sequence.
+    if (
+        category == "model_building"
+        and _case_wants_seq_free(case)
+        and "emodelx" in allowed
+    ):
+        rejections: Dict[str, str] = {}
+        if "modelangelo" in allowed:
+            rejections["modelangelo"] = (
+                "sequence_path is required by modelangelo but case has "
+                "has_sequence=false / emodelx_protocol=seq_free"
+            )
+        return {
+            "selected_backend": "emodelx",
+            "selection_reason": (
+                "map_level_seq_free: emodelx preferred over sequence-guided "
+                "backends (case has_sequence=false / emodelx_protocol=seq_free)"
+            ),
+            "rejected_backends": [b for b in allowed if b != "emodelx"],
+            "rejection_reasons": rejections,
             "fallback_applied": False,
             "category": category,
         }

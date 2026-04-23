@@ -44,6 +44,12 @@ def classify_success(
     elif _status_is_success(case_result.get("status")):
         success_kind = "execution_completed"
 
+    artifacts_raw = case_result.get("artifacts") or case_result.get("generated_paths") or []
+    has_artifacts = (
+        isinstance(artifacts_raw, (list, tuple))
+        and len(artifacts_raw) > 0
+    )
+
     evidence_strength = "medium"
     if (
         checks.get("preflight_ok")
@@ -53,7 +59,14 @@ def classify_success(
     ):
         evidence_strength = "high"
     elif not checks:
-        evidence_strength = "low"
+        # Fall back to artifact-based evidence: when smoke_run_checks were
+        # never populated (model-building backends do not emit them today),
+        # a real backend command that produced on-disk artifacts is at least
+        # medium-strength evidence of success.  Otherwise low.
+        if has_artifacts and _status_is_success(case_result.get("status")):
+            evidence_strength = "medium"
+        else:
+            evidence_strength = "low"
 
     return {
         "success_kind": success_kind,
@@ -80,6 +93,9 @@ def _build_key_signals(
         signals.append("real backend command executed")
     if checks.get("smoke_run_success") is True:
         signals.append("smoke run success flag set")
+    artifacts = case_result.get("artifacts") or case_result.get("generated_paths") or []
+    if isinstance(artifacts, (list, tuple)) and len(artifacts) > 0:
+        signals.append(f"{len(artifacts)} artifact(s) on disk")
     return signals
 
 
