@@ -350,7 +350,10 @@ def run_model_angelo(
         command=cmd_str,
         command_argv=argv,
         dry_run=False,
-        status="success" if ok else "failed",
+        # Unified success enum across the experiment framework is
+        # ``"completed"`` (EModelX, benchmark persistence, success_audit all
+        # use it).  Keep ModelAngelo aligned.
+        status="completed" if ok else "failed",
         return_code=completed.returncode,
         stdout=((completed.stdout or "") + f"\n[weights] {cache_msg}").strip(),
         stderr=completed.stderr or "",

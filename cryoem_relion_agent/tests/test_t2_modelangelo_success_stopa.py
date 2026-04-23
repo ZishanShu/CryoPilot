@@ -169,7 +169,7 @@ class TestSuccessAuditEvidenceForModelAngelo(unittest.TestCase):
         cr = {
             "benchmark_id": "T2",
             "backend": "modelangelo",
-            "status": "success",
+            "status": "completed",
             "return_code": 0,
             "execution_mode": "real",
             "artifacts": ["/out/model.cif", "/out/summary.json"],
@@ -277,7 +277,7 @@ class TestT2EndToEndFixedWorkflow(unittest.TestCase):
             payload = result.to_dict()
 
             self.assertEqual(payload["selected_backend"], "modelangelo")
-            self.assertEqual(payload["status"], "success")
+            self.assertEqual(payload["status"], "completed")
             self.assertEqual(payload["stage_reached"], "model_building")
 
             cr = payload["case_result"]
