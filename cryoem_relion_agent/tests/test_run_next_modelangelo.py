@@ -267,7 +267,7 @@ class TestModelAngeloSubprocess(unittest.TestCase):
             with patch("relion.model_angelo_runner.subprocess.run", return_value=mock_completed) as mock_run:
                 out = run_model_angelo(action, root, state=None, dry_run=False, model_builders_yaml=cfg)
                 mock_run.assert_called_once()
-            self.assertEqual(out["status"], "success")
+            self.assertEqual(out["status"], "completed")
             self.assertIsNotNone(out.get("output_dir"))
 
     def test_generated_model_path_when_cif_exists(self) -> None:
@@ -322,7 +322,7 @@ class TestModelAngeloSubprocess(unittest.TestCase):
                 kwargs = mock_run.call_args.kwargs
                 self.assertIn("env", kwargs)
                 self.assertEqual(kwargs["env"].get("TORCH_HOME"), str(torch_home.resolve()))
-            self.assertEqual(out["status"], "success")
+            self.assertEqual(out["status"], "completed")
 
 
 class TestRelionActionExecutorModelAngelo(unittest.TestCase):
