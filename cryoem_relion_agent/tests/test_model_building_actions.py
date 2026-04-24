@@ -249,6 +249,65 @@ class TestModelBuildingPlaceholderActions(unittest.TestCase):
             self.assertEqual(out.get("status"), "failed")
             self.assertFalse(out.get("success"))
 
+    def test_run_mica_harvests_mica_named_artifacts(self) -> None:
+        """Glob harvest picks up MICA-named PDB and timing CSV even on re-run."""
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo = root / "MICA"
+            out_dir = root / "mica_out"
+            repo.mkdir(parents=True)
+            (repo / "run.py").write_text("print('ok')", encoding="utf-8")
+            ex = RelionActionExecutor(root / "schemes.yaml")
+            action = Action(
+                name=ActionName.RUN_MICA,
+                reason="test",
+                parameters={
+                    "map_path": str(root / "m.mrc"),
+                    "sequence_path": str(root / "s.fasta"),
+                    "af3_dir": str(root / "af3_results"),
+                    "output_dir": str(out_dir),
+                    "mica_repo_dir": str(repo),
+                    "model_building_backend": "mica",
+                    "model_building_availability": "available",
+                    "model_building_execution_mode": "real",
+                    "model_building_preflight": {
+                        "backend_name": "mica",
+                        "available": True,
+                        "execution_mode": "real",
+                        "repo_path": str(repo),
+                        "run_py_path": str(repo / "run.py"),
+                        "python_path": "/usr/bin/python3",
+                        "af3_dir": str(root / "af3_results"),
+                        "output_path": str(out_dir),
+                    },
+                },
+                priority=90,
+            )
+            (root / "m.mrc").write_text("map", encoding="utf-8")
+            (root / "s.fasta").write_text(">a\nA", encoding="utf-8")
+            (root / "af3_results").mkdir(parents=True)
+
+            def _fake_run(cmd, **kwargs):
+                out_dir.mkdir(parents=True, exist_ok=True)
+                (out_dir / "15635_8at6_MICA_ca_model.pdb").write_text("pdb", encoding="utf-8")
+                (out_dir / "time_cost_15635_MICA.csv").write_text("step,seconds\n", encoding="utf-8")
+                p = MagicMock()
+                p.returncode = 0
+                p.stdout = "ok"
+                p.stderr = ""
+                return p
+
+            with patch("relion.mica_runner.subprocess.run", side_effect=_fake_run):
+                out = ex.execute(action=action, project_root=root, dry_run=False, state=None)
+
+            self.assertEqual(out.get("status"), "completed")
+            artifact_names = [Path(p).name for p in (out.get("artifact_paths") or [])]
+            gen_names = [Path(p).name for p in (out.get("generated_paths") or [])]
+            self.assertIn("15635_8at6_MICA_ca_model.pdb", artifact_names)
+            self.assertIn("time_cost_15635_MICA.csv", artifact_names)
+            self.assertIn("15635_8at6_MICA_ca_model.pdb", gen_names)
+            self.assertIn("time_cost_15635_MICA.csv", gen_names)
+
     def test_run_mica_preflight_blocked_no_subprocess(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
