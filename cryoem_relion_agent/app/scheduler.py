@@ -315,11 +315,24 @@ class Scheduler:
         qc,
         modeling_context: Optional[ModelingContext] = None,
         log_history: bool = True,
+        preferred_picking_backend: Optional[str] = None,
+        picking_overrides: Optional[Dict[str, Any]] = None,
     ) -> Action:
         """Apply policy; if it delegates structure routing, call ``StructureRouter``."""
-        action = self.policy_engine.decide_next_action(state, qc, log_history=log_history)
+        action = self.policy_engine.decide_next_action(
+            state,
+            qc,
+            log_history=log_history,
+            preferred_picking_backend=preferred_picking_backend,
+        )
         if action is not None:
             if action.name == ActionName.RUN_AUTOPICK:
+                if picking_overrides:
+                    merged = dict(action.parameters)
+                    for k, v in picking_overrides.items():
+                        if v is not None:
+                            merged[k] = v
+                    action = action.model_copy(update={"parameters": merged})
                 action = self._enrich_autopick_action(state, action)
             elif action.name == ActionName.RUN_CRYODRGN:
                 action = self._enrich_cryodrgn_action(state, action)
@@ -443,11 +456,19 @@ class Scheduler:
         self,
         sequence_override: Optional[Path] = None,
         modeling_context: Optional[ModelingContext] = None,
+        preferred_picking_backend: Optional[str] = None,
+        picking_overrides: Optional[Dict[str, Any]] = None,
     ) -> Action:
         """Decide next pipeline action (including structure-tool routing when applicable)."""
         self._begin_run_trace()
         state, qc = self.scan_project(sequence_override=sequence_override)
-        action = self._resolve_next_action(state, qc, modeling_context=modeling_context)
+        action = self._resolve_next_action(
+            state,
+            qc,
+            modeling_context=modeling_context,
+            preferred_picking_backend=preferred_picking_backend,
+            picking_overrides=picking_overrides,
+        )
         state.last_action = action.name.value
         self.state_manager.save_state(state)
         return action
@@ -457,11 +478,19 @@ class Scheduler:
         dry_run: bool = False,
         sequence_override: Optional[Path] = None,
         modeling_context: Optional[ModelingContext] = None,
+        preferred_picking_backend: Optional[str] = None,
+        picking_overrides: Optional[Dict[str, Any]] = None,
     ):
         """Decide and execute next action."""
         run_id = self._begin_run_trace()
         state, qc = self.scan_project(sequence_override=sequence_override)
-        action = self._resolve_next_action(state, qc, modeling_context=modeling_context)
+        action = self._resolve_next_action(
+            state,
+            qc,
+            modeling_context=modeling_context,
+            preferred_picking_backend=preferred_picking_backend,
+            picking_overrides=picking_overrides,
+        )
         decision_entry_id = self.policy_engine.get_last_decision_entry_id()
         # PolicyEngine may have already persisted the decision entry directly.
         # Keep scheduler-local chain pointer in sync so execution.previous_entry_id
@@ -508,6 +537,15 @@ class Scheduler:
             dry_run=dry_run,
             state=state,
         )
+        if isinstance(result, dict) and action.name == ActionName.RUN_AUTOPICK:
+            pk = str(action.parameters.get("picking_backend") or "").strip()
+            if pk:
+                result.setdefault("picking_backend", pk)
+                md = result.get("metadata")
+                if not isinstance(md, dict):
+                    md = {}
+                md.setdefault("picking_backend", pk)
+                result["metadata"] = md
         self._record_action_history(
             ActionHistoryEntry(
                 run_id=run_id,

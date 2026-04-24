@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import typer
 
@@ -87,13 +87,59 @@ def run_next(
         "--sequence",
         help="Path to FASTA/sequence file for this run.",
     ),
+    picking_backend: Optional[str] = typer.Option(
+        None,
+        "--picking-backend",
+        help="Picking backend override: relion_log | topaz | cryolo.",
+    ),
+    micrographs_star: Optional[Path] = typer.Option(
+        None,
+        "--micrographs-star",
+        help="Explicit micrographs.star input for picking (Topaz etc.).",
+    ),
+    particle_diameter_angstrom: Optional[float] = typer.Option(
+        None,
+        "--particle-diameter-angstrom",
+        help="Expected particle diameter in angstroms.",
+    ),
+    topaz_threshold: Optional[float] = typer.Option(
+        None,
+        "--topaz-threshold",
+        help="Topaz picking score threshold (e.g. -6).",
+    ),
+    topaz_device: Optional[str] = typer.Option(
+        None,
+        "--topaz-device",
+        help='Topaz device spec (e.g. "cpu", "0", "1").',
+    ),
+    topaz_output_dir: Optional[Path] = typer.Option(
+        None,
+        "--topaz-output-dir",
+        help="Override output directory for the Topaz run.",
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Decide and run next action."""
     setup_logging(verbose)
     validate_sequence_path(sequence)
+    picking_overrides: Dict[str, Any] = {}
+    if micrographs_star is not None:
+        picking_overrides["micrographs_star_path"] = str(micrographs_star)
+    if particle_diameter_angstrom is not None:
+        picking_overrides["particle_diameter_angstrom"] = float(particle_diameter_angstrom)
+    if topaz_threshold is not None:
+        picking_overrides["topaz_threshold"] = float(topaz_threshold)
+    if topaz_device is not None:
+        picking_overrides["topaz_device"] = str(topaz_device)
+    if topaz_output_dir is not None:
+        picking_overrides["output_dir"] = str(topaz_output_dir)
     scheduler = Scheduler(project_root=project)
-    action, result = scheduler.run_next(dry_run=dry_run, sequence_override=sequence)
+    action, result = scheduler.run_next(
+        dry_run=dry_run,
+        sequence_override=sequence,
+        preferred_picking_backend=(str(picking_backend).strip() if picking_backend else None),
+        picking_overrides=picking_overrides or None,
+    )
     typer.echo(json.dumps({"action": action.model_dump(mode="json"), "execution": result}, indent=2))
 
 
