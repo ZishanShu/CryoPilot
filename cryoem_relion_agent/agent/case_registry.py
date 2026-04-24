@@ -276,6 +276,38 @@ def default_cases() -> Dict[str, ExperimentCase]:
                 "notes": "F3 empty-output execution: rc=0 but picks.star is header-only.",
             }
         ),
+        "M1_mica_real_success_stopA": parse_case(
+            {
+                "case_id": "M1_mica_real_success_stopA",
+                "case_type": "map_level_case",
+                "dataset_name": "mica_sample_15635",
+                "dataset_root": None,
+                "input_state": {
+                    "has_map": True,
+                    "has_sequence": True,
+                    "af3_dir_present": True,
+                    "expected_failure_phase": "none",
+                    "expected_failure_kind": "none",
+                    "expected_root_cause_guess": "none",
+                },
+                "available_inputs": {
+                    "map_path": True,
+                    "sequence_path": True,
+                    "af3_dir": True,
+                    "output_dir": True,
+                    "mica_repo_dir": True,
+                    "mica_python": True,
+                    "mica_weights_dir": True,
+                    "mica_device": "cuda",
+                },
+                "target_stage": "model_building",
+                "evaluation_mode": "success_only",
+                "notes": (
+                    "MICA real success stop-A on the official sample dataset; "
+                    "map + sequence + AF3-structure prior inputs available."
+                ),
+            }
+        ),
         "T2_modelangelo_real_success_stopA": parse_case(
             {
                 "case_id": "T2_modelangelo_real_success_stopA",
