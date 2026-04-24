@@ -165,5 +165,21 @@ class TestFailureSetRegistry(unittest.TestCase):
         self.assertFalse(case.available_inputs.get("af3_dir"))
 
 
+class TestMicaSuccessRegistry(unittest.TestCase):
+    def test_m1_resolves_and_exposes_mica_inputs(self) -> None:
+        case = resolve_case("M1_mica_real_success_stopA")
+        self.assertEqual(case.case_type, "map_level_case")
+        self.assertEqual(case.target_stage, "model_building")
+        for key in (
+            "map_path",
+            "sequence_path",
+            "af3_dir",
+            "mica_repo_dir",
+            "mica_python",
+            "mica_weights_dir",
+        ):
+            self.assertIn(key, case.available_inputs)
+
+
 if __name__ == "__main__":
     unittest.main()
