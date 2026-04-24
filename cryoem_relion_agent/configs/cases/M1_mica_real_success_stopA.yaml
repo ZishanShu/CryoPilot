@@ -1,0 +1,36 @@
+# M1: MICA real success on the official MICA sample dataset.
+# This validates MICA as a conditional real-success backend when
+# map + sequence + AF3-structure prior are available.
+
+case_id: M1_mica_real_success_stopA
+case_type: map_level_case
+
+dataset_name: mica_sample_15635
+dataset_root: /root/share/szs/CryoAgent/MICA/input/15635
+
+input_state:
+  has_map: true
+  has_sequence: true
+  af3_dir_present: true
+  expected_failure_phase: none
+  expected_failure_kind: none
+  expected_root_cause_guess: none
+
+available_inputs:
+  map_path: /root/share/szs/CryoAgent/MICA/input/15635/emd_15635.map
+  sequence_path: /root/share/szs/CryoAgent/MICA/input/15635/8at6.fasta
+  af3_dir: /root/share/szs/CryoAgent/MICA/input/15635/AF3_structures
+  output_dir: /root/share/szs/CryoAgent/real_runs/M1_mica_real_success_stopA/output
+
+  mica_repo_dir: /root/share/szs/CryoAgent/MICA
+  mica_python: /root/share/conda_envs/cryoagent/bin/python
+  mica_weights_dir: /root/share/szs/CryoAgent/MICA/trained_models
+  mica_device: cuda
+
+target_stage: model_building
+evaluation_mode: success_only
+
+notes: >-
+  MICA completed real execution on the official sample dataset with map,
+  sequence, and AF3-structure prior inputs. The expected final CA model is
+  /root/share/szs/CryoAgent/real_runs/M1_mica_real_success_stopA/output/15635_8at6_MICA_ca_model.pdb.
