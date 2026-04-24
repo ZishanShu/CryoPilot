@@ -880,6 +880,7 @@ class RelionActionExecutor:
                         "python_path": res.get("python_path"),
                         "af3_dir": res.get("af3_dir"),
                         "artifact_paths": res.get("artifact_paths"),
+                        "generated_paths": res.get("generated_paths") or res.get("artifact_paths"),
                         "return_code": res.get("return_code"),
                         "stdout": res.get("stdout") or "",
                         "stderr": res.get("stderr") or "",

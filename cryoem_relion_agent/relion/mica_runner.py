@@ -6,6 +6,24 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
+_MICA_ARTIFACT_GLOBS: tuple = (
+    "*_MICA_ca_model.pdb",
+    "*_MICA(init)_ca_model.pdb",
+    "time_cost_*_MICA.csv",
+    "*.pdb",
+    "*.cif",
+)
+
+
+def _harvest_mica_artifacts(output_dir: Path, created: List[str]) -> List[str]:
+    found = {str(p) for p in (created or [])}
+    if output_dir.is_dir():
+        for pattern in _MICA_ARTIFACT_GLOBS:
+            for p in output_dir.rglob(pattern):
+                if p.is_file():
+                    found.add(str(p))
+    return sorted(found)
+
 
 def run_mica_pipeline(
     *,
@@ -64,6 +82,7 @@ def run_mica_pipeline(
     )
     after = {str(p) for p in output_dir.rglob("*") if p.exists()}
     created = sorted(after - before)
+    harvested = _harvest_mica_artifacts(output_dir, created)
     has_artifacts = len(created) > 0 or any(output_dir.iterdir())
 
     if proc.returncode != 0:
@@ -79,7 +98,8 @@ def run_mica_pipeline(
             "return_code": int(proc.returncode),
             "stdout": (proc.stdout or "")[-8000:],
             "stderr": (proc.stderr or "")[-8000:],
-            "artifact_paths": created[:200],
+            "artifact_paths": harvested[:200],
+            "generated_paths": harvested[:200],
             "error": "mica subprocess failed",
         }
     if not has_artifacts:
@@ -95,7 +115,8 @@ def run_mica_pipeline(
             "return_code": int(proc.returncode),
             "stdout": (proc.stdout or "")[-8000:],
             "stderr": (proc.stderr or "")[-8000:],
-            "artifact_paths": created[:200],
+            "artifact_paths": harvested[:200],
+            "generated_paths": harvested[:200],
             "error": "missing_output_artifacts",
         }
 
@@ -111,5 +132,6 @@ def run_mica_pipeline(
         "return_code": int(proc.returncode),
         "stdout": (proc.stdout or "")[-8000:],
         "stderr": (proc.stderr or "")[-8000:],
-        "artifact_paths": created[:200],
+        "artifact_paths": harvested[:200],
+        "generated_paths": harvested[:200],
     }
