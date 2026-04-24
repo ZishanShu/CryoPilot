@@ -108,48 +108,6 @@ def _pick_first_cif(output_dir: Path) -> Optional[Path]:
     return None
 
 
-_MODEL_ANGELO_STRUCTURE_GLOBS: tuple = ("*.cif", "*.pdb")
-_MODEL_ANGELO_SUMMARY_GLOBS: tuple = (
-    "*summary*",
-    "*ranking*",
-    "*score*",
-)
-
-
-def _harvest_model_angelo_artifacts(output_dir: Path) -> List[str]:
-    """Collect ModelAngelo success products from ``output_dir``.
-
-    Priority is the primary structure files (``.cif`` / ``.pdb``) followed by
-    summary / ranking / score auxiliary outputs.  Log files (``*.log``,
-    ``*.txt``) are intentionally excluded — they are exposed via
-    ``log_path`` separately, not as main artifacts.
-    """
-    if not output_dir.is_dir():
-        return []
-    found: List[str] = []
-    seen: set[str] = set()
-
-    def _add(p: Path) -> None:
-        if not p.is_file():
-            return
-        s = str(p)
-        if s in seen:
-            return
-        seen.add(s)
-        found.append(s)
-
-    for pattern in _MODEL_ANGELO_STRUCTURE_GLOBS:
-        for p in sorted(output_dir.rglob(pattern), key=lambda q: q.stat().st_mtime, reverse=True):
-            _add(p)
-    for pattern in _MODEL_ANGELO_SUMMARY_GLOBS:
-        for p in sorted(output_dir.rglob(pattern)):
-            # Skip obvious log files even if they happen to match.
-            if p.suffix.lower() in {".log", ".txt"}:
-                continue
-            _add(p)
-    return found
-
-
 def _resolve_torch_home(cfg: Dict[str, Any]) -> Optional[Path]:
     """
     Resolve TORCH_HOME with precedence:
@@ -227,14 +185,10 @@ def run_model_angelo(
         )
         return er.to_serializable_dict()
 
-    explicit_out_raw = (action.parameters or {}).get("output_dir")
-    if explicit_out_raw and str(explicit_out_raw).strip():
-        output_dir = Path(str(explicit_out_raw).strip()).expanduser().resolve()
-    else:
-        agent_root = project_root / ".cryoem_agent"
-        runs_sub = cfg.get("output_runs_subdir", "modelangelo_runs")
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        output_dir = agent_root / runs_sub / stamp
+    agent_root = project_root / ".cryoem_agent"
+    runs_sub = cfg.get("output_runs_subdir", "modelangelo_runs")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    output_dir = agent_root / runs_sub / stamp
 
     exe, exe_err = _resolve_executable(cfg.get("executable", "model_angelo"))
     if exe_err:
@@ -344,21 +298,16 @@ def run_model_angelo(
 
     gen_cif = _pick_first_cif(output_dir)
     ok = completed.returncode == 0
-    harvested = _harvest_model_angelo_artifacts(output_dir) if ok else []
     er = ExecutionResult(
         action_name=action.name.value,
         command=cmd_str,
         command_argv=argv,
         dry_run=False,
-        # Unified success enum across the experiment framework is
-        # ``"completed"`` (EModelX, benchmark persistence, success_audit all
-        # use it).  Keep ModelAngelo aligned.
-        status="completed" if ok else "failed",
+        status="success" if ok else "failed",
         return_code=completed.returncode,
         stdout=((completed.stdout or "") + f"\n[weights] {cache_msg}").strip(),
         stderr=completed.stderr or "",
         output_dir=str(output_dir),
-        generated_paths=harvested,
         generated_model_path=str(gen_cif.resolve()) if gen_cif else None,
         log_path=str(log_path),
         error_message=None if ok else f"model_angelo exited with code {completed.returncode}",

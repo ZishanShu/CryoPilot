@@ -276,26 +276,6 @@ def default_cases() -> Dict[str, ExperimentCase]:
                 "notes": "F3 empty-output execution: rc=0 but picks.star is header-only.",
             }
         ),
-        "T2_modelangelo_real_success_stopA": parse_case(
-            {
-                "case_id": "T2_modelangelo_real_success_stopA",
-                "case_type": "map_level_case",
-                "dataset_name": "tutorial5",
-                "dataset_root": None,
-                "input_state": {
-                    "has_map": True,
-                    "has_sequence": True,
-                },
-                "available_inputs": {
-                    "map_path": True,
-                    "sequence_path": True,
-                    "output_dir": True,
-                },
-                "target_stage": "model_building",
-                "evaluation_mode": "success_only",
-                "notes": "Tutorial5 ModelAngelo real success stop-A (sequence-guided).",
-            }
-        ),
         "T1_tutorial5_map_emodelx_stopA": parse_case(
             {
                 "case_id": "T1_tutorial5_map_emodelx_stopA",
