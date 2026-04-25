@@ -637,8 +637,19 @@ class Scheduler:
             result["picking_qc_status"] = str(params.get("picking_qc_status") or "failed_qc")
             result["picking_qc_flags"] = list(params.get("picking_qc_flags") or [])
             result["recommended_next_action"] = str(params.get("recommended_next_action") or "")
-            for _k in ("n_picks", "n_micrographs_total", "zero_pick_micrograph_ratio",
-                       "precision", "recall", "f1"):
+            for _k in (
+                "n_picks",
+                "n_micrographs_with_picks",
+                "n_micrographs_total",
+                "zero_pick_micrograph_ratio",
+                "mean_picks_per_micrograph",
+                "median_picks_per_micrograph",
+                "matching_tolerance_px",
+                "coordinate_scale",
+                "precision",
+                "recall",
+                "f1",
+            ):
                 result[_k] = params.get(_k)
             md = result.get("metadata")
             if not isinstance(md, dict):
@@ -648,20 +659,37 @@ class Scheduler:
             md["picking_qc_status"] = result["picking_qc_status"]
             md["picking_qc_flags"] = result["picking_qc_flags"]
             md["recommended_next_action"] = result["recommended_next_action"]
-            ge: Dict[str, Any] = {}
-            for _k in ("precision", "recall", "f1"):
-                _v = params.get(_k)
-                if _v is not None:
-                    ge[_k] = _v
-            md["picking_qc"] = {
-                "qc_status": result["picking_qc_status"],
-                "qc_flags": result["picking_qc_flags"],
-                "recommended_next_action": result["recommended_next_action"],
-                "n_picks": params.get("n_picks"),
-                "n_micrographs_total": params.get("n_micrographs_total"),
-                "zero_pick_micrograph_ratio": params.get("zero_pick_micrograph_ratio"),
-                **({"ground_truth_evaluation": ge} if ge else {}),
-            }
+            # Prefer the full picking_qc dict if the policy engine handed us one;
+            # otherwise reconstruct from flattened fields.
+            nested_pq = params.get("picking_qc")
+            if isinstance(nested_pq, dict) and nested_pq:
+                pq_persist = dict(nested_pq)
+            else:
+                ge: Dict[str, Any] = {}
+                for _k in ("precision", "recall", "f1", "matching_tolerance_px"):
+                    _v = params.get(_k)
+                    if _v is not None:
+                        ge[_k] = _v
+                pq_persist = {
+                    "qc_status": result["picking_qc_status"],
+                    "qc_flags": result["picking_qc_flags"],
+                    "recommended_next_action": result["recommended_next_action"],
+                    "n_picks": params.get("n_picks"),
+                    "n_micrographs_with_picks": params.get("n_micrographs_with_picks"),
+                    "n_micrographs_total": params.get("n_micrographs_total"),
+                    "zero_pick_micrograph_ratio": params.get("zero_pick_micrograph_ratio"),
+                    "mean_picks_per_micrograph": params.get("mean_picks_per_micrograph"),
+                    "median_picks_per_micrograph": params.get("median_picks_per_micrograph"),
+                    "matching_tolerance_px": params.get("matching_tolerance_px"),
+                    "coordinate_scale": params.get("coordinate_scale"),
+                }
+                if ge:
+                    pq_persist["ground_truth_evaluation"] = ge
+            md["picking_qc"] = pq_persist
+            # Mirror the nested picking_qc onto the top-level result too, so any
+            # downstream consumer that reads ``last_execution["picking_qc"]``
+            # (rather than ``metadata.picking_qc``) sees the same payload.
+            result["picking_qc"] = pq_persist
             result["metadata"] = md
         self._record_action_history(
             ActionHistoryEntry(

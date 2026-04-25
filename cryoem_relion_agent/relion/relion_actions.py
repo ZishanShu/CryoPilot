@@ -711,18 +711,27 @@ class RelionActionExecutor:
                 return out_cd
 
             if name == "request_human_review":
+                params = action.parameters or {}
+                branch = str(params.get("branch_name", "heterogeneity")).strip() or "heterogeneity"
+                if branch == "picking_qc":
+                    metadata = {
+                        "branch_name": "picking_qc",
+                        "picking_backend": str(params.get("picking_backend", "topaz")),
+                    }
+                else:
+                    metadata = {
+                        "heterogeneity_backend": str(
+                            params.get("heterogeneity_backend", "human_review")
+                        ),
+                        "branch_name": branch,
+                    }
                 er = _run_relion_cli_action(
                     action_name="request_human_review",
                     runner=self.runner,
-                    command=["echo", "[DRY-RUN] Human review requested for heterogeneity branch"],
+                    command=["echo", f"[DRY-RUN] Human review requested for {branch} branch"],
                     project_dir=project_root,
                     dry_run=dry_run,
-                    metadata={
-                        "heterogeneity_backend": str(
-                            action.parameters.get("heterogeneity_backend", "human_review")
-                        ),
-                        "branch_name": "heterogeneity",
-                    },
+                    metadata=metadata,
                 )
                 out = er.to_serializable_dict()
                 out["reason"] = action.reason

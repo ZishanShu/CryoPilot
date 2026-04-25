@@ -222,14 +222,13 @@ class PipelineReport(BaseModel):
             lines.append(f"- Backend: {self.extra.get('picking_backend') or 'N/A'}")
             lines.append(f"- QC status: {qc.get('qc_status') or 'N/A'}")
             lines.append(f"- Picks: {qc.get('n_picks')}")
-            lines.append(
-                f"- Micrographs with picks: {qc.get('n_micrographs_with_picks')}"
-                + (
-                    f" / {qc.get('n_micrographs_total')}"
-                    if qc.get("n_micrographs_total") is not None
-                    else ""
-                )
-            )
+            n_with = qc.get("n_micrographs_with_picks")
+            n_total = qc.get("n_micrographs_total")
+            with_str = "N/A" if n_with is None else str(n_with)
+            if n_total is not None:
+                lines.append(f"- Micrographs with picks: {with_str} / {n_total}")
+            elif n_with is not None:
+                lines.append(f"- Micrographs with picks: {with_str}")
             mp = qc.get("mean_picks_per_micrograph")
             if mp is not None:
                 lines.append(f"- Mean picks/micrograph: {mp}")
@@ -237,9 +236,13 @@ class PipelineReport(BaseModel):
                 lines.append(f"- Zero-pick micrograph ratio: {qc.get('zero_pick_micrograph_ratio')}")
             ge = qc.get("ground_truth_evaluation") or {}
             if ge:
+                tol = ge.get("matching_tolerance_px")
+                if tol is None:
+                    tol = qc.get("matching_tolerance_px")
+                tol_str = "N/A" if tol is None else f"{tol}px"
                 lines.append(
                     f"- GT match: precision={ge.get('precision')} recall={ge.get('recall')} f1={ge.get('f1')}"
-                    f" tol={ge.get('matching_tolerance_px')}px"
+                    f" tol={tol_str}"
                 )
             flags = qc.get("qc_flags") or []
             if flags:

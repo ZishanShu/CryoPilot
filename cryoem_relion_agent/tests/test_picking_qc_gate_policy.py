@@ -26,12 +26,16 @@ def _qc_failed_payload() -> dict:
         ],
         "recommended_next_action": "threshold_sweep_or_train_topaz",
         "n_picks": 43,
+        "n_micrographs_with_picks": 13,
         "n_micrographs_total": 29,
         "zero_pick_micrograph_ratio": 0.551724,
+        "matching_tolerance_px": 80.0,
+        "coordinate_scale": 4.0,
         "ground_truth_evaluation": {
             "precision": 0.069767,
             "recall": 0.000558,
             "f1": 0.001108,
+            "matching_tolerance_px": 80.0,
         },
     }
 
@@ -188,6 +192,33 @@ class TestPickingQCGatePolicy(unittest.TestCase):
             "threshold_sweep_or_train_topaz",
         )
         self.assertAlmostEqual(action.parameters.get("f1"), 0.001108)
+
+    def test_gate_parameters_include_full_picking_qc_payload(self) -> None:
+        """When firing from a Topaz last_execution, the gate's action.parameters
+        must include the full nested picking_qc dict and the additional fields
+        (n_micrographs_with_picks, matching_tolerance_px, coordinate_scale)."""
+        state = _state(
+            stage="AutoPick",
+            last_execution={
+                "action_name": "run_autopick",
+                "picking_backend": "topaz",
+                "status": "success",
+                "metadata": {"picking_qc": _qc_failed_payload()},
+            },
+        )
+        action = _pe().decide_next_action(state, _qc_ctf_done())
+        self.assertEqual(action.name, ActionName.REQUEST_HUMAN_REVIEW)
+        params = action.parameters
+        self.assertEqual(params.get("n_micrographs_with_picks"), 13)
+        self.assertEqual(params.get("n_micrographs_total"), 29)
+        self.assertEqual(params.get("matching_tolerance_px"), 80.0)
+        self.assertEqual(params.get("coordinate_scale"), 4.0)
+        nested = params.get("picking_qc")
+        self.assertIsInstance(nested, dict)
+        self.assertEqual(nested.get("n_micrographs_with_picks"), 13)
+        self.assertEqual(
+            nested.get("ground_truth_evaluation", {}).get("matching_tolerance_px"), 80.0
+        )
 
     def test_heterogeneity_human_review_does_not_trigger_gate(self) -> None:
         # A human_review for heterogeneity (different branch) must not activate the gate.

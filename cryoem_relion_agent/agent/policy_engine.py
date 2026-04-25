@@ -328,7 +328,9 @@ class PolicyEngine:
 
         Works for both the original Topaz execution result (via picking_qc) and
         the persisted gate execution result (via direct fields + metadata).
-        Returns None if the evidence for failed_qc is absent.
+        Returns None if the evidence for failed_qc is absent. The returned dict
+        always includes a ``picking_qc`` sub-dict with the full payload (when
+        available), in addition to flattened fields for direct report access.
         """
         md: Dict[str, Any] = le.get("metadata") if isinstance(le.get("metadata"), dict) else {}
 
@@ -339,23 +341,55 @@ class PolicyEngine:
         qc_status = str(_f("picking_qc_status") or "").strip()
         branch = str(_f("branch_name") or "").strip()
         if qc_status == "failed_qc" and branch == "picking_qc":
-            # Persisted gate result — recover directly stored fields.
+            # Persisted gate result — recover directly stored fields and a
+            # nested picking_qc dict (preserved by Scheduler when available).
             flags = list(_f("picking_qc_flags") or [])
             rec = str(_f("recommended_next_action") or "manual_review")
             backend = str(_f("picking_backend") or "topaz")
-            return {
+            nested_pq = le.get("picking_qc")
+            if not isinstance(nested_pq, dict) and isinstance(md, dict):
+                nested_pq = md.get("picking_qc")
+            if not isinstance(nested_pq, dict):
+                nested_pq = None
+            ge = nested_pq.get("ground_truth_evaluation") if isinstance(nested_pq, dict) else None
+            if not isinstance(ge, dict):
+                ge = {}
+            params: Dict[str, Any] = {
                 "branch_name": "picking_qc",
                 "picking_backend": backend,
                 "picking_qc_status": "failed_qc",
                 "picking_qc_flags": flags,
                 "recommended_next_action": rec,
-                "n_picks": _f("n_picks"),
-                "n_micrographs_total": _f("n_micrographs_total"),
-                "zero_pick_micrograph_ratio": _f("zero_pick_micrograph_ratio"),
-                "precision": _f("precision"),
-                "recall": _f("recall"),
-                "f1": _f("f1"),
+                "n_picks": (nested_pq.get("n_picks") if isinstance(nested_pq, dict) else None) or _f("n_picks"),
+                "n_micrographs_with_picks": (
+                    nested_pq.get("n_micrographs_with_picks") if isinstance(nested_pq, dict) else None
+                ),
+                "n_micrographs_total": (
+                    nested_pq.get("n_micrographs_total") if isinstance(nested_pq, dict) else None
+                ) or _f("n_micrographs_total"),
+                "zero_pick_micrograph_ratio": (
+                    nested_pq.get("zero_pick_micrograph_ratio") if isinstance(nested_pq, dict) else None
+                ) or _f("zero_pick_micrograph_ratio"),
+                "mean_picks_per_micrograph": (
+                    nested_pq.get("mean_picks_per_micrograph") if isinstance(nested_pq, dict) else None
+                ),
+                "median_picks_per_micrograph": (
+                    nested_pq.get("median_picks_per_micrograph") if isinstance(nested_pq, dict) else None
+                ),
+                "matching_tolerance_px": (
+                    ge.get("matching_tolerance_px")
+                    or (nested_pq.get("matching_tolerance_px") if isinstance(nested_pq, dict) else None)
+                ),
+                "coordinate_scale": (
+                    nested_pq.get("coordinate_scale") if isinstance(nested_pq, dict) else None
+                ),
+                "precision": ge.get("precision") if ge else _f("precision"),
+                "recall": ge.get("recall") if ge else _f("recall"),
+                "f1": ge.get("f1") if ge else _f("f1"),
             }
+            if isinstance(nested_pq, dict):
+                params["picking_qc"] = dict(nested_pq)
+            return params
 
         # Original Topaz execution result — look for picking_qc dict.
         picking_qc: Optional[Dict[str, Any]] = le.get("picking_qc")
@@ -376,11 +410,19 @@ class PolicyEngine:
             "picking_qc_flags": flags,
             "recommended_next_action": rec,
             "n_picks": picking_qc.get("n_picks"),
+            "n_micrographs_with_picks": picking_qc.get("n_micrographs_with_picks"),
             "n_micrographs_total": picking_qc.get("n_micrographs_total"),
             "zero_pick_micrograph_ratio": picking_qc.get("zero_pick_micrograph_ratio"),
+            "mean_picks_per_micrograph": picking_qc.get("mean_picks_per_micrograph"),
+            "median_picks_per_micrograph": picking_qc.get("median_picks_per_micrograph"),
+            "matching_tolerance_px": (
+                ge.get("matching_tolerance_px") or picking_qc.get("matching_tolerance_px")
+            ),
+            "coordinate_scale": picking_qc.get("coordinate_scale"),
             "precision": ge.get("precision"),
             "recall": ge.get("recall"),
             "f1": ge.get("f1"),
+            "picking_qc": dict(picking_qc),
         }
 
     def _build_picking_qc_gate_action(

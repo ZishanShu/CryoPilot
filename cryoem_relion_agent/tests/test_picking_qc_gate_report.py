@@ -31,12 +31,16 @@ def _failed_qc_payload() -> dict:
         ],
         "recommended_next_action": "threshold_sweep_or_train_topaz",
         "n_picks": 43,
+        "n_micrographs_with_picks": 13,
         "n_micrographs_total": 29,
         "zero_pick_micrograph_ratio": 0.551724,
+        "matching_tolerance_px": 80.0,
+        "coordinate_scale": 4.0,
         "ground_truth_evaluation": {
             "precision": 0.069767,
             "recall": 0.000558,
             "f1": 0.001108,
+            "matching_tolerance_px": 80.0,
         },
     }
 
@@ -214,6 +218,43 @@ class TestPickingQCGateReport(unittest.TestCase):
             self.assertIn("Picking QC Gate", md_text)
             self.assertIn("threshold_sweep_or_train_topaz", md_text)
             self.assertNotIn("run_autopick", md_text.split("Next action:")[1][:50])
+
+    def test_run_next_dry_run_command_uses_picking_qc_branch_label(self) -> None:
+        """The dry-run echo command for the gate must say "picking_qc branch",
+        not "heterogeneity branch"."""
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            proj = build_fixture_project(root, "picking_ready")
+            _seed_failed_topaz_state(proj)
+
+            sched = Scheduler(project_root=proj)
+            _action, result = sched.run_next(dry_run=True)
+            cmd = str(result.get("command") or "")
+            self.assertIn("picking_qc branch", cmd)
+            self.assertNotIn("heterogeneity branch", cmd)
+
+    def test_report_shows_full_picking_qc_metrics_after_gate_persist(self) -> None:
+        """After run-next dry-runs the gate, generate-report must surface
+        n_micrographs_with_picks=13 / 29 and tol=80.0px (not Nonepx)."""
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            proj = build_fixture_project(root, "picking_ready")
+            _seed_failed_topaz_state(proj)
+
+            sched = Scheduler(project_root=proj)
+            sched.run_next(dry_run=True)
+
+            sched2 = Scheduler(project_root=proj)
+            out_md = proj / "report.md"
+            sched2.generate_report(out_md=out_md, refresh_state=False)
+            md_text = out_md.read_text(encoding="utf-8")
+
+            self.assertIn("Micrographs with picks: 13 / 29", md_text)
+            self.assertIn("tol=80.0px", md_text)
+            self.assertIn("Human review requested for picking_qc branch", md_text)
+            self.assertNotIn("heterogeneity branch", md_text)
+            self.assertNotIn("None / 29", md_text)
+            self.assertNotIn("Nonepx", md_text)
 
     def test_regression_relion_log_run_without_failed_qc_unblocked(self) -> None:
         """Regression: a relion_log last_execution without picking_qc must NOT trigger
