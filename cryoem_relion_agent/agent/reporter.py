@@ -405,6 +405,17 @@ class Reporter:
             if hex_p:
                 extra["cryodrgn_executable"] = str(hex_p)[:500]
 
+        picking_qc: Optional[Dict[str, Any]] = None
+        if state.last_execution:
+            le = state.last_execution
+            qc_payload = le.get("picking_qc") if isinstance(le, dict) else None
+            if not isinstance(qc_payload, dict):
+                md_payload = le.get("metadata") if isinstance(le, dict) else None
+                if isinstance(md_payload, dict):
+                    qc_payload = md_payload.get("picking_qc")
+            if isinstance(qc_payload, dict):
+                picking_qc = qc_payload
+
         return PipelineReport(
             state=state,
             qc=qc,
@@ -421,6 +432,7 @@ class Reporter:
             extra=extra,
             model_building_preflight=mb_preflight,
             picking_preflight=pk_preflight,
+            picking_qc=picking_qc,
             heterogeneity_preflight=het_preflight,
             capability_matrix=capability_matrix or {},
             backend_selection={

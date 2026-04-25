@@ -69,6 +69,10 @@ class PipelineReport(BaseModel):
         default=None,
         description="Structured Topaz / picking preflight (availability, executable_path, blocked_reason, ...).",
     )
+    picking_qc: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Structured picking QC gate result (qc_status, n_picks, qc_flags, ground_truth_evaluation, ...).",
+    )
     heterogeneity_preflight: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Structured cryoDRGN heterogeneity preflight (availability, execution_mode, blocked_reason, ...).",
@@ -195,6 +199,38 @@ class PipelineReport(BaseModel):
                 lines.append(f"- AF3 dir: {self.extra.get('mica_af3_dir')}")
             if self.extra.get("mica_output"):
                 lines.append(f"- Output path: {self.extra.get('mica_output')}")
+        if self.picking_qc:
+            qc = self.picking_qc
+            lines.append("")
+            lines.append("## Picking QC")
+            lines.append(f"- Backend: {self.extra.get('picking_backend') or 'N/A'}")
+            lines.append(f"- QC status: {qc.get('qc_status') or 'N/A'}")
+            lines.append(f"- Picks: {qc.get('n_picks')}")
+            lines.append(
+                f"- Micrographs with picks: {qc.get('n_micrographs_with_picks')}"
+                + (
+                    f" / {qc.get('n_micrographs_total')}"
+                    if qc.get("n_micrographs_total") is not None
+                    else ""
+                )
+            )
+            mp = qc.get("mean_picks_per_micrograph")
+            if mp is not None:
+                lines.append(f"- Mean picks/micrograph: {mp}")
+            if qc.get("zero_pick_micrograph_ratio") is not None:
+                lines.append(f"- Zero-pick micrograph ratio: {qc.get('zero_pick_micrograph_ratio')}")
+            ge = qc.get("ground_truth_evaluation") or {}
+            if ge:
+                lines.append(
+                    f"- GT match: precision={ge.get('precision')} recall={ge.get('recall')} f1={ge.get('f1')}"
+                    f" tol={ge.get('matching_tolerance_px')}px"
+                )
+            flags = qc.get("qc_flags") or []
+            if flags:
+                lines.append(f"- Flags: {', '.join(flags)}")
+            rec = qc.get("recommended_next_action")
+            if rec:
+                lines.append(f"- Recommendation: {rec}")
         lines.append("")
         lines.append("## Backend Capabilities")
         lines.append(f"- Backend entries: {len(self.capability_matrix)}")

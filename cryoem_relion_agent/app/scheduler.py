@@ -309,6 +309,47 @@ class Scheduler:
                 merged.setdefault("af3_dir", pf.get("af3_dir"))
         return action.model_copy(update={"parameters": merged})
 
+    @staticmethod
+    def _attach_picking_qc(result: Dict[str, Any], action: Action) -> None:
+        """Run picking QC gate over Topaz output and merge it into ``result``.
+
+        Never raises: any QC error is recorded under ``picking_qc_error``.
+        """
+        params = action.parameters if isinstance(action.parameters, dict) else {}
+        md = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
+        picks_path = (
+            result.get("topaz_output_path")
+            or md.get("topaz_output_path")
+            or params.get("picked_particles_star")
+            or params.get("topaz_output_path")
+        )
+        if not picks_path or not Path(str(picks_path)).is_file():
+            return
+        try:
+            from agent.picking_qc import evaluate_picking_output
+            mics = params.get("micrographs_star_path")
+            gt_dir = params.get("gt_coords_dir") or params.get("picking_gt_coords_dir")
+            qc_dict = evaluate_picking_output(
+                picks_path=Path(str(picks_path)),
+                micrographs_star_path=Path(str(mics)) if mics else None,
+                gt_coords_dir=Path(str(gt_dir)) if gt_dir else None,
+                coordinate_scale=float(params.get("picking_coordinate_scale") or 1.0),
+                matching_tolerance_px=float(
+                    params.get("picking_matching_tolerance_px") or 80.0
+                ),
+                thresholds=(
+                    params.get("picking_qc_thresholds")
+                    if isinstance(params.get("picking_qc_thresholds"), dict)
+                    else None
+                ),
+            )
+            md["picking_qc"] = qc_dict
+            result["picking_qc"] = qc_dict
+        except Exception as exc:  # pragma: no cover - defensive: never block run-next
+            md["picking_qc_error"] = str(exc)
+            result["picking_qc_error"] = str(exc)
+        result["metadata"] = md
+
     def _resolve_next_action(
         self,
         state,
@@ -546,6 +587,8 @@ class Scheduler:
                     md = {}
                 md.setdefault("picking_backend", pk)
                 result["metadata"] = md
+            if pk == "topaz":
+                self._attach_picking_qc(result, action)
         self._record_action_history(
             ActionHistoryEntry(
                 run_id=run_id,
