@@ -621,6 +621,48 @@ class Scheduler:
                 result["metadata"] = md
             if pk == "topaz":
                 self._attach_picking_qc(result, action, qc_params=picking_qc_params)
+
+        # Picking QC gate: when the gate fires (request_human_review, branch_name=picking_qc),
+        # persist the gate evidence into result/metadata so that subsequent scan_project/
+        # generate-report calls can recover the failed_qc state and keep the gate active.
+        if (
+            isinstance(result, dict)
+            and action.name == ActionName.REQUEST_HUMAN_REVIEW
+            and isinstance(action.parameters, dict)
+            and str(action.parameters.get("branch_name", "")).strip() == "picking_qc"
+        ):
+            params = action.parameters
+            result["branch_name"] = "picking_qc"
+            result["picking_backend"] = str(params.get("picking_backend") or "topaz")
+            result["picking_qc_status"] = str(params.get("picking_qc_status") or "failed_qc")
+            result["picking_qc_flags"] = list(params.get("picking_qc_flags") or [])
+            result["recommended_next_action"] = str(params.get("recommended_next_action") or "")
+            for _k in ("n_picks", "n_micrographs_total", "zero_pick_micrograph_ratio",
+                       "precision", "recall", "f1"):
+                result[_k] = params.get(_k)
+            md = result.get("metadata")
+            if not isinstance(md, dict):
+                md = {}
+            md["branch_name"] = "picking_qc"
+            md["picking_backend"] = result["picking_backend"]
+            md["picking_qc_status"] = result["picking_qc_status"]
+            md["picking_qc_flags"] = result["picking_qc_flags"]
+            md["recommended_next_action"] = result["recommended_next_action"]
+            ge: Dict[str, Any] = {}
+            for _k in ("precision", "recall", "f1"):
+                _v = params.get(_k)
+                if _v is not None:
+                    ge[_k] = _v
+            md["picking_qc"] = {
+                "qc_status": result["picking_qc_status"],
+                "qc_flags": result["picking_qc_flags"],
+                "recommended_next_action": result["recommended_next_action"],
+                "n_picks": params.get("n_picks"),
+                "n_micrographs_total": params.get("n_micrographs_total"),
+                "zero_pick_micrograph_ratio": params.get("zero_pick_micrograph_ratio"),
+                **({"ground_truth_evaluation": ge} if ge else {}),
+            }
+            result["metadata"] = md
         self._record_action_history(
             ActionHistoryEntry(
                 run_id=run_id,

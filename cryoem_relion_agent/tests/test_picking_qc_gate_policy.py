@@ -142,6 +142,78 @@ class TestPickingQCGatePolicy(unittest.TestCase):
         action = _pe().decide_next_action(state, _qc_ctf_done())
         self.assertEqual(action.name, ActionName.RUN_EXTRACT)
 
+    def test_gate_is_idempotent_when_last_execution_is_human_review_dry_run(self) -> None:
+        """After run-next dry-runs the gate action, last_execution is overwritten with
+        a request_human_review result. The gate must still fire on subsequent calls."""
+        state = _state(
+            stage="CtfFind",
+            last_execution={
+                "action_name": "request_human_review",
+                "branch_name": "picking_qc",
+                "picking_backend": "topaz",
+                "picking_qc_status": "failed_qc",
+                "picking_qc_flags": [
+                    "severe_under_picking",
+                    "many_empty_micrographs",
+                    "low_f1_against_ground_truth",
+                ],
+                "recommended_next_action": "threshold_sweep_or_train_topaz",
+                "n_picks": 43,
+                "n_micrographs_total": 29,
+                "zero_pick_micrograph_ratio": 0.551724,
+                "precision": 0.069767,
+                "recall": 0.000558,
+                "f1": 0.001108,
+                "status": "dry_run",
+                "metadata": {
+                    "branch_name": "picking_qc",
+                    "picking_backend": "topaz",
+                    "picking_qc_status": "failed_qc",
+                    "picking_qc_flags": [
+                        "severe_under_picking",
+                        "many_empty_micrographs",
+                        "low_f1_against_ground_truth",
+                    ],
+                    "recommended_next_action": "threshold_sweep_or_train_topaz",
+                },
+            },
+        )
+        action = _pe().decide_next_action(state, _qc_ctf_done())
+        self.assertEqual(action.name, ActionName.REQUEST_HUMAN_REVIEW)
+        self.assertNotEqual(action.name, ActionName.RUN_AUTOPICK)
+        self.assertEqual(action.parameters.get("branch_name"), "picking_qc")
+        self.assertEqual(action.parameters.get("picking_qc_status"), "failed_qc")
+        self.assertEqual(
+            action.parameters.get("recommended_next_action"),
+            "threshold_sweep_or_train_topaz",
+        )
+        self.assertAlmostEqual(action.parameters.get("f1"), 0.001108)
+
+    def test_heterogeneity_human_review_does_not_trigger_gate(self) -> None:
+        # A human_review for heterogeneity (different branch) must not activate the gate.
+        state = _state(
+            stage="Class2D",
+            last_execution={
+                "action_name": "request_human_review",
+                "branch_name": "heterogeneity",
+                "picking_qc_status": "",
+                "status": "dry_run",
+                "metadata": {
+                    "branch_name": "heterogeneity",
+                    "heterogeneity_backend": "human_review",
+                },
+            },
+        )
+        qc = QCMetrics(
+            motioncorr_completed=True,
+            ctf_completed=True,
+            heterogeneity_warning=True,
+        )
+        action = _pe().decide_next_action(state, qc)
+        self.assertNotEqual(action.name, ActionName.RUN_AUTOPICK)
+        # Gate must not fire; heterogeneity review or pipeline continuation is expected.
+        self.assertNotEqual(action.parameters.get("branch_name"), "picking_qc")
+
 
 class TestPickingQCGateReportMarkdown(unittest.TestCase):
     """to_markdown shows compact gate section when next_action is the gate."""

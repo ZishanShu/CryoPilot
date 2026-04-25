@@ -168,6 +168,86 @@ class TestPickingQCGateReport(unittest.TestCase):
             self.assertIsNotNone(state.last_execution)
             self.assertIn("picking_qc", state.last_execution.get("metadata", {}))
 
+    def test_run_next_persists_gate_evidence_and_generate_report_remains_blocked(self) -> None:
+        """End-to-end idempotency: run-next dry-run overwrites last_execution with a
+        request_human_review result, but the gate evidence is preserved so a subsequent
+        generate-report still returns request_human_review and shows the QC gate."""
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            proj = build_fixture_project(root, "picking_ready")
+            _seed_failed_topaz_state(proj)
+
+            # Step 1: run-next dry-run — gate fires, returns request_human_review.
+            sched = Scheduler(project_root=proj)
+            action, result = sched.run_next(dry_run=True)
+            self.assertEqual(action.name.value, "request_human_review")
+            self.assertEqual(action.parameters.get("branch_name"), "picking_qc")
+            self.assertEqual(action.parameters.get("picking_qc_status"), "failed_qc")
+
+            # Step 2: result must carry gate evidence so last_execution is recoverable.
+            self.assertEqual(result.get("branch_name"), "picking_qc")
+            self.assertEqual(result.get("picking_backend"), "topaz")
+            self.assertEqual(result.get("picking_qc_status"), "failed_qc")
+            self.assertIsNotNone(result.get("picking_qc_flags"))
+            md = result.get("metadata") or {}
+            self.assertEqual(md.get("branch_name"), "picking_qc")
+            self.assertEqual(md.get("picking_qc_status"), "failed_qc")
+
+            # Step 3: reload sample_state.json — last_execution must still carry evidence.
+            import json as _json
+            state_path = proj / ".cryoem_agent" / "sample_state.json"
+            raw = _json.loads(state_path.read_text(encoding="utf-8"))
+            le = raw.get("last_execution") or {}
+            self.assertEqual(le.get("branch_name"), "picking_qc")
+            self.assertEqual(le.get("picking_qc_status"), "failed_qc")
+
+            # Step 4: generate-report on a fresh scheduler instance reads the
+            # persisted state and must still return request_human_review.
+            sched2 = Scheduler(project_root=proj)
+            out_md = proj / "report_after_run_next.md"
+            report = sched2.generate_report(out_md=out_md, refresh_state=False)
+            self.assertEqual(report.next_action.name.value, "request_human_review")
+            self.assertEqual(report.next_action.parameters.get("branch_name"), "picking_qc")
+            self.assertEqual(report.extra.get("picking_backend"), "topaz")
+
+            md_text = out_md.read_text(encoding="utf-8")
+            self.assertIn("Picking QC Gate", md_text)
+            self.assertIn("threshold_sweep_or_train_topaz", md_text)
+            self.assertNotIn("run_autopick", md_text.split("Next action:")[1][:50])
+
+    def test_regression_relion_log_run_without_failed_qc_unblocked(self) -> None:
+        """Regression: a relion_log last_execution without picking_qc must NOT trigger
+        the gate; the pipeline must return run_autopick normally."""
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            proj = build_fixture_project(root, "picking_ready")
+            # Seed a relion_log run (no picking_qc) as the last_execution.
+            agent_dir = proj / ".cryoem_agent"
+            agent_dir.mkdir(parents=True, exist_ok=True)
+            import json as _json
+            seed = {
+                "project_id": "fixture_pick",
+                "project_path": str(proj.resolve()),
+                "stage": "CtfFind",
+                "status": "running",
+                "n_particles_picked": 0,
+                "n_particles_after_2d": 0,
+                "last_execution": {
+                    "action_name": "run_autopick",
+                    "picking_backend": "relion_log",
+                    "status": "dry_run",
+                    "metadata": {"picking_backend": "relion_log"},
+                },
+                "updated_at": "2025-01-01T00:00:00Z",
+            }
+            (agent_dir / "sample_state.json").write_text(
+                _json.dumps(seed, indent=2), encoding="utf-8"
+            )
+            sched = Scheduler(project_root=proj)
+            report = sched.generate_report(refresh_state=False)
+            self.assertNotEqual(report.next_action.name.value, "request_human_review")
+            self.assertEqual(report.next_action.name.value, "run_autopick")
+
 
 if __name__ == "__main__":
     unittest.main()
