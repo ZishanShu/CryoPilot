@@ -182,6 +182,55 @@ def count_micrographs_in_star(path: Path) -> int:
     return n
 
 
+def _normalize_micrograph_name(name: Any) -> str:
+    """Return basename without extension; tolerant to full paths and bare stems."""
+    s = str(name or "").strip()
+    if not s:
+        return ""
+    return Path(s).stem
+
+
+def _micrograph_names_in_star(path: Path) -> List[str]:
+    """Return ordered, deduplicated list of normalized ``rlnMicrographName`` basenames."""
+    try:
+        text = Path(path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    lines = text.splitlines()
+    columns: List[str] = []
+    data_start = -1
+    for i, ln in enumerate(lines):
+        if ln.strip().startswith("loop_"):
+            columns, data_start = _parse_loop_columns(lines, i + 1)
+            break
+    if data_start < 0:
+        return []
+    name_idx: Optional[int] = None
+    for i, c in enumerate(columns):
+        if c.lower() in {"rlnmicrographname", "micrograph", "image_name"}:
+            name_idx = i
+            break
+    seen: set = set()
+    out: List[str] = []
+    for ln in lines[data_start:]:
+        s = ln.strip()
+        if not s or s.startswith("#"):
+            continue
+        parts = s.split()
+        if name_idx is not None and len(parts) > name_idx:
+            tok = parts[name_idx]
+        elif parts:
+            tok = parts[0]
+        else:
+            continue
+        norm = _normalize_micrograph_name(tok)
+        if not norm or norm in seen:
+            continue
+        seen.add(norm)
+        out.append(norm)
+    return out
+
+
 def _parse_gt_csv(path: Path) -> List[Tuple[float, float]]:
     coords: List[Tuple[float, float]] = []
     try:
@@ -261,23 +310,30 @@ def _greedy_match(
 
 
 def _gt_evaluation(
-    rows_by_mic: Dict[str, List[Tuple[float, float]]],
-    gt_dir: Path,
+    pred_by_mic: Dict[str, List[Tuple[float, float]]],
+    gt_index: Dict[str, Path],
+    eval_names: List[str],
     coordinate_scale: float,
     tolerance_px: float,
 ) -> Dict[str, Any]:
-    gt_index: Dict[str, Path] = {}
-    if Path(gt_dir).is_dir():
-        for p in Path(gt_dir).glob("*.csv"):
-            gt_index[p.stem] = p
+    """Evaluate predictions vs. GT over an explicit micrograph evaluation set.
+
+    Names in ``pred_by_mic`` / ``gt_index`` / ``eval_names`` must already be
+    normalized (basename without extension).  Empty preds against non-empty GT
+    contribute fully to FN; preds without GT contribute fully to FP.
+    """
     tp_total = fp_total = fn_total = 0
     matched_mics = 0
-    for mic, preds in rows_by_mic.items():
-        scaled = [(x * coordinate_scale, y * coordinate_scale) for (x, y) in preds]
-        stem = Path(str(mic)).stem
-        gt_path = gt_index.get(stem)
+    pred_total = 0
+    gt_total = 0
+    for name in eval_names:
+        preds_raw = pred_by_mic.get(name, [])
+        scaled = [(x * coordinate_scale, y * coordinate_scale) for (x, y) in preds_raw]
+        gt_path = gt_index.get(name)
         gts = _parse_gt_csv(gt_path) if gt_path is not None else []
-        if gt_path is not None:
+        pred_total += len(scaled)
+        gt_total += len(gts)
+        if scaled and gts:
             matched_mics += 1
         tp, fp, fn = _greedy_match(scaled, gts, tolerance_px)
         tp_total += tp
@@ -297,6 +353,9 @@ def _gt_evaluation(
         "coordinate_scale": float(coordinate_scale),
         "matched_micrographs": matched_mics,
         "gt_micrographs_available": len(gt_index),
+        "evaluated_micrographs": len(eval_names),
+        "gt_particles_total": gt_total,
+        "pred_particles_total": pred_total,
     }
 
 
@@ -361,24 +420,38 @@ def evaluate_picking_output(
         qc_flags.append("many_empty_micrographs")
 
     gt_eval: Optional[Dict[str, Any]] = None
-    if gt_coords_dir is not None and Path(gt_coords_dir).is_dir() and rows:
-        rows_by_mic: Dict[str, List[Tuple[float, float]]] = {}
+    if gt_coords_dir is not None and Path(gt_coords_dir).is_dir():
+        gt_index: Dict[str, Path] = {}
+        for p in Path(gt_coords_dir).glob("*.csv"):
+            key = _normalize_micrograph_name(p.name)
+            if key:
+                gt_index[key] = p
+        pred_by_mic: Dict[str, List[Tuple[float, float]]] = {}
         for r in rows:
             x = r.get("x")
             y = r.get("y")
             if x is None or y is None:
                 continue
-            rows_by_mic.setdefault(str(r.get("micrograph") or ""), []).append(
-                (float(x), float(y))
+            key = _normalize_micrograph_name(r.get("micrograph"))
+            if not key:
+                continue
+            pred_by_mic.setdefault(key, []).append((float(x), float(y)))
+        if micrographs_star_path is not None:
+            eval_names = _micrograph_names_in_star(Path(micrographs_star_path))
+        else:
+            union = set(pred_by_mic.keys()) | set(gt_index.keys())
+            union.discard("")
+            eval_names = sorted(union)
+        if eval_names:
+            gt_eval = _gt_evaluation(
+                pred_by_mic,
+                gt_index,
+                eval_names,
+                coordinate_scale=float(coordinate_scale),
+                tolerance_px=float(matching_tolerance_px),
             )
-        gt_eval = _gt_evaluation(
-            rows_by_mic,
-            Path(gt_coords_dir),
-            coordinate_scale=float(coordinate_scale),
-            tolerance_px=float(matching_tolerance_px),
-        )
-        if gt_eval.get("f1") is not None and gt_eval["f1"] < th["min_f1"]:
-            qc_flags.append("low_f1_against_ground_truth")
+            if gt_eval.get("f1") is not None and gt_eval["f1"] < th["min_f1"]:
+                qc_flags.append("low_f1_against_ground_truth")
 
     qc_status = "passed" if not qc_flags else "failed_qc"
     recommended = (

@@ -251,6 +251,111 @@ class TestGroundTruthEvaluation(unittest.TestCase):
             self.assertAlmostEqual(ge["f1"], 1.0)
 
 
+class TestGTEvaluationOverAllMicrographs(unittest.TestCase):
+    """Regression: GT recall/FN must count zero-pick micrographs too."""
+
+    def test_recall_includes_zero_pick_micrographs(self) -> None:
+        with TemporaryDirectory() as tmp:
+            picks = Path(tmp) / "picks.star"
+            # Predictions only for mic_a; mic_b and mic_c get nothing.
+            _write_star(picks, ["mic_a.mrc 100 100 -1.0"])
+            mics = Path(tmp) / "micrographs.star"
+            _write_micrographs_star(mics, ["mic_a.mrc", "mic_b.mrc", "mic_c.mrc"])
+            gt_dir = Path(tmp) / "gt"
+            gt_dir.mkdir()
+            (gt_dir / "mic_a.csv").write_text(
+                "x_coord,y_coord\n100,100\n", encoding="utf-8"
+            )
+            (gt_dir / "mic_b.csv").write_text(
+                "x_coord,y_coord\n10,10\n20,20\n", encoding="utf-8"
+            )
+            (gt_dir / "mic_c.csv").write_text(
+                "x_coord,y_coord\n50,50\n60,60\n70,70\n", encoding="utf-8"
+            )
+            qc = evaluate_picking_output(
+                picks,
+                micrographs_star_path=mics,
+                gt_coords_dir=gt_dir,
+                matching_tolerance_px=20.0,
+                thresholds={"min_total_picks": 1, "min_mean_picks_per_micrograph": 0.1},
+            )
+            ge = qc["ground_truth_evaluation"]
+            self.assertEqual(ge["tp"], 1)
+            self.assertEqual(ge["fp"], 0)
+            self.assertEqual(ge["fn"], 5)
+            self.assertEqual(ge["evaluated_micrographs"], 3)
+            self.assertEqual(ge["gt_particles_total"], 6)
+            self.assertEqual(ge["pred_particles_total"], 1)
+            self.assertEqual(ge["gt_micrographs_available"], 3)
+            # mic_a is the only one with both preds and GT.
+            self.assertEqual(ge["matched_micrographs"], 1)
+            self.assertAlmostEqual(ge["precision"], 1.0, places=4)
+            self.assertAlmostEqual(ge["recall"], 1 / 6, places=4)
+            # f1 = 2 * P * R / (P + R) = (2/6) / (7/6) = 2/7
+            self.assertAlmostEqual(ge["f1"], 2 / 7, places=4)
+            # f1 ≈ 0.286 is well above min_f1=0.05.
+            self.assertNotIn("low_f1_against_ground_truth", qc["qc_flags"])
+
+    def test_normalization_handles_full_paths_and_extensions(self) -> None:
+        with TemporaryDirectory() as tmp:
+            picks = Path(tmp) / "picks.star"
+            # Topaz often emits image_name without extension.
+            _write_star(picks, ["stack_0002_2x_SumCorr 100 100 -1.0"])
+            mics = Path(tmp) / "micrographs.star"
+            # micrographs.star carries a full-path .mrc.
+            _write_micrographs_star(
+                mics, ["/path/to/stack_0002_2x_SumCorr.mrc"]
+            )
+            gt_dir = Path(tmp) / "gt"
+            gt_dir.mkdir()
+            (gt_dir / "stack_0002_2x_SumCorr.csv").write_text(
+                "x_coord,y_coord\n100,100\n", encoding="utf-8"
+            )
+            qc = evaluate_picking_output(
+                picks,
+                micrographs_star_path=mics,
+                gt_coords_dir=gt_dir,
+                matching_tolerance_px=10.0,
+                thresholds={"min_total_picks": 1, "min_mean_picks_per_micrograph": 0.1},
+            )
+            ge = qc["ground_truth_evaluation"]
+            self.assertEqual(ge["tp"], 1)
+            self.assertEqual(ge["fp"], 0)
+            self.assertEqual(ge["fn"], 0)
+            self.assertEqual(ge["evaluated_micrographs"], 1)
+            self.assertEqual(ge["matched_micrographs"], 1)
+
+    def test_fallback_eval_set_unions_pred_and_gt_stems(self) -> None:
+        """When micrographs.star is absent, eval set = preds ∪ GT csv stems."""
+        with TemporaryDirectory() as tmp:
+            picks = Path(tmp) / "picks.star"
+            _write_star(picks, ["mic_a.mrc 100 100 -1.0"])
+            gt_dir = Path(tmp) / "gt"
+            gt_dir.mkdir()
+            (gt_dir / "mic_a.csv").write_text(
+                "x_coord,y_coord\n100,100\n", encoding="utf-8"
+            )
+            # GT-only micrograph with no predictions: must still contribute FN.
+            (gt_dir / "mic_b.csv").write_text(
+                "x_coord,y_coord\n50,50\n", encoding="utf-8"
+            )
+            qc = evaluate_picking_output(
+                picks,
+                gt_coords_dir=gt_dir,
+                matching_tolerance_px=10.0,
+                thresholds={"min_total_picks": 1, "min_mean_picks_per_micrograph": 0.1},
+            )
+            ge = qc["ground_truth_evaluation"]
+            self.assertEqual(ge["evaluated_micrographs"], 2)
+            self.assertEqual(ge["tp"], 1)
+            self.assertEqual(ge["fp"], 0)
+            self.assertEqual(ge["fn"], 1)
+            self.assertEqual(ge["pred_particles_total"], 1)
+            self.assertEqual(ge["gt_particles_total"], 2)
+            self.assertEqual(ge["gt_micrographs_available"], 2)
+            self.assertEqual(ge["matched_micrographs"], 1)
+
+
 class TestSerializability(unittest.TestCase):
     def test_result_is_json_serializable(self) -> None:
         with TemporaryDirectory() as tmp:
