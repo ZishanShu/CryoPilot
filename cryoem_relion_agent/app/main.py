@@ -117,6 +117,21 @@ def run_next(
         "--topaz-output-dir",
         help="Override output directory for the Topaz run.",
     ),
+    gt_coords_dir: Optional[Path] = typer.Option(
+        None,
+        "--gt-coords-dir",
+        help="Directory of CryoPPP-style ground-truth coordinate CSVs (one per micrograph). Enables GT evaluation in picking QC.",
+    ),
+    coordinate_scale: Optional[float] = typer.Option(
+        None,
+        "--coordinate-scale",
+        help="Scale predicted picks to GT coordinate space (e.g. 4.0 for ds4 Topaz). Default 1.0.",
+    ),
+    matching_tolerance_px: Optional[float] = typer.Option(
+        None,
+        "--matching-tolerance-px",
+        help="Tolerance for greedy GT matching, in pixels. Default 80.0.",
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Decide and run next action."""
@@ -133,12 +148,20 @@ def run_next(
         picking_overrides["topaz_device"] = str(topaz_device)
     if topaz_output_dir is not None:
         picking_overrides["output_dir"] = str(topaz_output_dir)
+    picking_qc_params: Dict[str, Any] = {}
+    if gt_coords_dir is not None:
+        picking_qc_params["gt_coords_dir"] = str(gt_coords_dir)
+    if coordinate_scale is not None:
+        picking_qc_params["coordinate_scale"] = float(coordinate_scale)
+    if matching_tolerance_px is not None:
+        picking_qc_params["matching_tolerance_px"] = float(matching_tolerance_px)
     scheduler = Scheduler(project_root=project)
     action, result = scheduler.run_next(
         dry_run=dry_run,
         sequence_override=sequence,
         preferred_picking_backend=(str(picking_backend).strip() if picking_backend else None),
         picking_overrides=picking_overrides or None,
+        picking_qc_params=picking_qc_params or None,
     )
     typer.echo(json.dumps({"action": action.model_dump(mode="json"), "execution": result}, indent=2))
 

@@ -107,6 +107,129 @@ class TestSchedulerPickingQCAttachment(unittest.TestCase):
             self.assertEqual(result["metadata"]["picking_qc_error"], "boom")
             self.assertNotIn("picking_qc", result)
 
+    def test_picking_qc_uses_qc_params_for_gt_evaluation(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            picks = root / "picks.star"
+            # Predictions in ds4 space (25 -> 100 with scale=4) matching GT.
+            self._star(
+                picks,
+                [
+                    "mic_001.mrc 25 25 -1.0",
+                    "mic_001.mrc 50 50 -1.0",
+                    "mic_001.mrc 75 75 -1.0",
+                ],
+            )
+            gt_dir = root / "gt"
+            gt_dir.mkdir()
+            (gt_dir / "mic_001.csv").write_text(
+                "x_coord,y_coord\n100,100\n200,200\n300,300\n",
+                encoding="utf-8",
+            )
+            result: dict = {
+                "action_name": "run_autopick",
+                "status": "success",
+                "topaz_output_path": str(picks),
+                "metadata": {"topaz_output_path": str(picks)},
+            }
+            action = Action(
+                name=ActionName.RUN_AUTOPICK,
+                reason="t",
+                parameters={
+                    "picking_backend": "topaz",
+                    "picking_qc_thresholds": {
+                        "min_total_picks": 1,
+                        "min_mean_picks_per_micrograph": 0.1,
+                    },
+                },
+                priority=78,
+            )
+            Scheduler._attach_picking_qc(
+                result,
+                action,
+                qc_params={
+                    "gt_coords_dir": str(gt_dir),
+                    "coordinate_scale": 4.0,
+                    "matching_tolerance_px": 10.0,
+                },
+            )
+            qc = result["picking_qc"]
+            self.assertEqual(qc["coordinate_scale"], 4.0)
+            self.assertEqual(qc["matching_tolerance_px"], 10.0)
+            ge = qc["ground_truth_evaluation"]
+            self.assertIsNotNone(ge)
+            self.assertEqual(ge["tp"], 3)
+            self.assertEqual(ge["fp"], 0)
+            self.assertEqual(ge["fn"], 0)
+            self.assertAlmostEqual(ge["precision"], 1.0)
+            self.assertAlmostEqual(ge["recall"], 1.0)
+            self.assertAlmostEqual(ge["f1"], 1.0)
+            self.assertNotIn("low_f1_against_ground_truth", qc["qc_flags"])
+
+    def test_picking_qc_low_f1_flag_when_gt_mismatch(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            picks = root / "picks.star"
+            self._star(picks, ["mic_001.mrc 9000 9000 -1.0"])
+            gt_dir = root / "gt"
+            gt_dir.mkdir()
+            (gt_dir / "mic_001.csv").write_text(
+                "x_coord,y_coord\n100,100\n", encoding="utf-8"
+            )
+            result: dict = {
+                "action_name": "run_autopick",
+                "status": "success",
+                "topaz_output_path": str(picks),
+                "metadata": {},
+            }
+            action = Action(
+                name=ActionName.RUN_AUTOPICK,
+                reason="t",
+                parameters={
+                    "picking_backend": "topaz",
+                    "picking_qc_thresholds": {
+                        "min_total_picks": 1,
+                        "min_mean_picks_per_micrograph": 0.1,
+                    },
+                },
+                priority=78,
+            )
+            Scheduler._attach_picking_qc(
+                result,
+                action,
+                qc_params={
+                    "gt_coords_dir": str(gt_dir),
+                    "coordinate_scale": 1.0,
+                    "matching_tolerance_px": 20.0,
+                },
+            )
+            qc = result["picking_qc"]
+            self.assertEqual(qc["ground_truth_evaluation"]["f1"], 0.0)
+            self.assertIn("low_f1_against_ground_truth", qc["qc_flags"])
+
+    def test_picking_qc_default_when_qc_params_absent(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            picks = root / "picks.star"
+            self._star(picks, ["m1.mrc 1 2 -1.0", "m1.mrc 3 4 -1.5"])
+            result: dict = {
+                "action_name": "run_autopick",
+                "status": "success",
+                "topaz_output_path": str(picks),
+                "metadata": {},
+            }
+            action = Action(
+                name=ActionName.RUN_AUTOPICK,
+                reason="t",
+                parameters={"picking_backend": "topaz"},
+                priority=78,
+            )
+            Scheduler._attach_picking_qc(result, action)
+            qc = result["picking_qc"]
+            self.assertIsNone(qc["ground_truth_evaluation"])
+            self.assertEqual(qc["coordinate_scale"], 1.0)
+            self.assertEqual(qc["matching_tolerance_px"], 80.0)
+
     def test_picking_qc_skipped_when_picks_path_missing(self) -> None:
         result: dict = {"action_name": "run_autopick", "status": "success", "metadata": {}}
         action = Action(

@@ -107,6 +107,42 @@ class TestRunNextCLITopazRouting(unittest.TestCase):
                 self.assertEqual(cap.kwargs.get("preferred_picking_backend"), backend)
 
 
+class TestRunNextCLIPickingQCParams(unittest.TestCase):
+    def test_cli_passes_gt_options_into_picking_qc_params(self) -> None:
+        runner = CliRunner()
+        cap = _Capture()
+        with TemporaryDirectory() as tmp:
+            gt = Path(tmp) / "gt"
+            gt.mkdir()
+            with patch.object(Scheduler, "run_next", cap.make_stub()):
+                res = runner.invoke(
+                    app,
+                    [
+                        "run-next",
+                        "--project", tmp,
+                        "--dry-run",
+                        "--picking-backend", "topaz",
+                        "--gt-coords-dir", str(gt),
+                        "--coordinate-scale", "4",
+                        "--matching-tolerance-px", "80",
+                    ],
+                )
+            self.assertEqual(res.exit_code, 0, msg=res.output)
+            qcp = cap.kwargs.get("picking_qc_params") or {}
+            self.assertEqual(qcp.get("gt_coords_dir"), str(gt))
+            self.assertEqual(qcp.get("coordinate_scale"), 4.0)
+            self.assertEqual(qcp.get("matching_tolerance_px"), 80.0)
+
+    def test_cli_picking_qc_params_absent_when_unused(self) -> None:
+        runner = CliRunner()
+        cap = _Capture()
+        with TemporaryDirectory() as tmp:
+            with patch.object(Scheduler, "run_next", cap.make_stub()):
+                res = runner.invoke(app, ["run-next", "--project", tmp, "--dry-run"])
+            self.assertEqual(res.exit_code, 0, msg=res.output)
+            self.assertIsNone(cap.kwargs.get("picking_qc_params"))
+
+
 class TestSchedulerPickingOverrideWiring(unittest.TestCase):
     """End-to-end wiring: scheduler injects overrides + enriches Topaz action."""
 

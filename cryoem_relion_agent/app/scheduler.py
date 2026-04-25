@@ -310,10 +310,16 @@ class Scheduler:
         return action.model_copy(update={"parameters": merged})
 
     @staticmethod
-    def _attach_picking_qc(result: Dict[str, Any], action: Action) -> None:
+    def _attach_picking_qc(
+        result: Dict[str, Any],
+        action: Action,
+        qc_params: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """Run picking QC gate over Topaz output and merge it into ``result``.
 
-        Never raises: any QC error is recorded under ``picking_qc_error``.
+        ``qc_params`` (from the CLI) overrides the matching keys carried on
+        ``action.parameters``.  Never raises: any QC error is recorded under
+        ``picking_qc_error``.
         """
         params = action.parameters if isinstance(action.parameters, dict) else {}
         md = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
@@ -325,17 +331,32 @@ class Scheduler:
         )
         if not picks_path or not Path(str(picks_path)).is_file():
             return
+        overrides = qc_params or {}
+        gt_dir = (
+            overrides.get("gt_coords_dir")
+            or params.get("gt_coords_dir")
+            or params.get("picking_gt_coords_dir")
+        )
+        coord_scale = (
+            overrides.get("coordinate_scale")
+            if overrides.get("coordinate_scale") is not None
+            else params.get("picking_coordinate_scale")
+        )
+        tol_px = (
+            overrides.get("matching_tolerance_px")
+            if overrides.get("matching_tolerance_px") is not None
+            else params.get("picking_matching_tolerance_px")
+        )
         try:
             from agent.picking_qc import evaluate_picking_output
             mics = params.get("micrographs_star_path")
-            gt_dir = params.get("gt_coords_dir") or params.get("picking_gt_coords_dir")
             qc_dict = evaluate_picking_output(
                 picks_path=Path(str(picks_path)),
                 micrographs_star_path=Path(str(mics)) if mics else None,
                 gt_coords_dir=Path(str(gt_dir)) if gt_dir else None,
-                coordinate_scale=float(params.get("picking_coordinate_scale") or 1.0),
-                matching_tolerance_px=float(
-                    params.get("picking_matching_tolerance_px") or 80.0
+                coordinate_scale=float(coord_scale) if coord_scale is not None else 1.0,
+                matching_tolerance_px=(
+                    float(tol_px) if tol_px is not None else 80.0
                 ),
                 thresholds=(
                     params.get("picking_qc_thresholds")
@@ -521,6 +542,7 @@ class Scheduler:
         modeling_context: Optional[ModelingContext] = None,
         preferred_picking_backend: Optional[str] = None,
         picking_overrides: Optional[Dict[str, Any]] = None,
+        picking_qc_params: Optional[Dict[str, Any]] = None,
     ):
         """Decide and execute next action."""
         run_id = self._begin_run_trace()
@@ -588,7 +610,7 @@ class Scheduler:
                 md.setdefault("picking_backend", pk)
                 result["metadata"] = md
             if pk == "topaz":
-                self._attach_picking_qc(result, action)
+                self._attach_picking_qc(result, action, qc_params=picking_qc_params)
         self._record_action_history(
             ActionHistoryEntry(
                 run_id=run_id,
