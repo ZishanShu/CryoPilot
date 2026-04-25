@@ -32,6 +32,7 @@ class QCMetrics(BaseModel):
     particle_count_warning: bool = False
     orientation_warning: bool = False
     heterogeneity_warning: bool = False
+    heterogeneity_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     confidence_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
 
     @field_validator("current_resolution", mode="before")

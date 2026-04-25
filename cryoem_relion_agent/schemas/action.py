@@ -26,6 +26,7 @@ class ActionName(str, Enum):
     RUN_POSTPROCESS = "run_postprocess"
     RUN_MODELANGELO = "run_modelangelo"
     RUN_CRYODRGN = "run_cryodrgn"
+    RUN_CRYODRGN_AI = "run_cryodrgn_ai"
     RUN_EMODELX = "run_emodelx"
     RUN_MICA = "run_mica"
     RUN_VALIDATION = "run_validation"
