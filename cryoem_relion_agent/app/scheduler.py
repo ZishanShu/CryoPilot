@@ -326,7 +326,7 @@ class Scheduler:
                 merged.setdefault("af3_dir", pf.get("af3_dir"))
         return action.model_copy(update={"parameters": merged})
 
-    def _maybe_reconstruction_action(self, state, qc) -> Optional[Action]:
+    def _maybe_reconstruction_action(self, state, qc, modeling_context: Optional[ModelingContext] = None) -> Optional[Action]:
         """Optionally route reconstruction to cryodrgn_ai; RELION remains default."""
 
         ctx: Dict[str, Any] = {}
@@ -335,6 +335,10 @@ class Scheduler:
             cfg = last.get("reconstruction_context")
             if isinstance(cfg, dict):
                 ctx.update(cfg)
+        if modeling_context is not None:
+            raw_ctx = getattr(modeling_context, "reconstruction_context", None)
+            if isinstance(raw_ctx, dict):
+                ctx.update(raw_ctx)
         decision = self.reconstruction_policy.select(state, qc, context=ctx)
         if decision.get("selected_backend") != "cryodrgn_ai":
             return None

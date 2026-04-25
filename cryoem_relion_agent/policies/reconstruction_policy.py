@@ -34,8 +34,6 @@ class ReconstructionPolicy:
         score = ctx.get("heterogeneity_score")
         if score is None:
             score = getattr(qc, "heterogeneity_score", None)
-        if score is None and bool(getattr(qc, "heterogeneity_warning", False)):
-            score = 1.0
 
         no_initial_model = _truthy(ctx.get("no_initial_model")) or _truthy(ctx.get("no_reliable_initial_model"))
         if "no_initial_model" not in ctx and "no_reliable_initial_model" not in ctx:
