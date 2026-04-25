@@ -271,6 +271,27 @@ class PolicyEngine:
             )
         return None
 
+    @staticmethod
+    def _extract_latest_picking_qc(state: SampleState) -> Optional[Dict[str, Any]]:
+        """Return picking_qc dict from last_execution, or None if absent."""
+        le = getattr(state, "last_execution", None)
+        if le is None:
+            return None
+        if not isinstance(le, dict):
+            try:
+                le = vars(le)
+            except TypeError:
+                return None
+        qc = le.get("picking_qc")
+        if isinstance(qc, dict):
+            return qc
+        md = le.get("metadata")
+        if isinstance(md, dict):
+            qc = md.get("picking_qc")
+            if isinstance(qc, dict):
+                return qc
+        return None
+
     def decide_extract_stage(self, state: SampleState, qc: QCMetrics) -> Optional[Action]:
         priorities = self.rules["priorities"]
         if self._is_stage_at_least(state, "AutoPick") and not self._is_stage_at_least(state, "Extract"):
@@ -387,6 +408,33 @@ class PolicyEngine:
 
         upstream_extract = self.decide_extract_stage(state, qc)
         if upstream_extract is not None:
+            picking_qc = self._extract_latest_picking_qc(state)
+            if isinstance(picking_qc, dict) and picking_qc.get("qc_status") == "failed_qc":
+                flags = list(picking_qc.get("qc_flags") or [])
+                rec = str(picking_qc.get("recommended_next_action") or "manual_review")
+                reason_flags = ", ".join(flags) if flags else "unknown"
+                ge = picking_qc.get("ground_truth_evaluation") or {}
+                return ret(Action(
+                    name=ActionName.REQUEST_HUMAN_REVIEW,
+                    reason=(
+                        f"Picking QC failed after Topaz: {reason_flags}. "
+                        f"Recommended recovery: {rec}."
+                    ),
+                    parameters={
+                        "branch_name": "picking_qc",
+                        "picking_backend": str(picking_qc.get("picking_backend") or "topaz"),
+                        "picking_qc_status": str(picking_qc.get("qc_status") or ""),
+                        "picking_qc_flags": flags,
+                        "recommended_next_action": rec,
+                        "n_picks": picking_qc.get("n_picks"),
+                        "n_micrographs_total": picking_qc.get("n_micrographs_total"),
+                        "zero_pick_micrograph_ratio": picking_qc.get("zero_pick_micrograph_ratio"),
+                        "precision": ge.get("precision"),
+                        "recall": ge.get("recall"),
+                        "f1": ge.get("f1"),
+                    },
+                    priority=priorities.get("request_human_review", 95),
+                ))
             return ret(upstream_extract)
 
         upstream_class2d = self.decide_class2d_stage(state, qc)

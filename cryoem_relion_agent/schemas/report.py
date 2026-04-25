@@ -111,6 +111,22 @@ class PipelineReport(BaseModel):
         lines.append(f"- Next action: {self.next_action.name.value if self.next_action else 'N/A'}")
         if self.next_action:
             lines.append(f"- Next action reason: {self.next_action.reason}")
+        if (
+            self.next_action
+            and self.next_action.name.value == "request_human_review"
+            and isinstance(self.next_action.parameters, dict)
+            and self.next_action.parameters.get("branch_name") == "picking_qc"
+        ):
+            params = self.next_action.parameters
+            lines.append("")
+            lines.append("## Picking QC Gate")
+            lines.append(f"- Status: {params.get('picking_qc_status', 'N/A')}")
+            flags = params.get("picking_qc_flags") or []
+            if flags:
+                lines.append(f"- Flags: {', '.join(str(f) for f in flags)}")
+            lines.append(f"- Recommendation: {params.get('recommended_next_action', 'N/A')}")
+            if params.get("f1") is not None:
+                lines.append(f"- F1: {params.get('f1')}")
         if self.extra.get("picking_backend"):
             lines.append(f"- Picking backend: {self.extra.get('picking_backend')}")
         if self.extra.get("picking_selection_reason"):
