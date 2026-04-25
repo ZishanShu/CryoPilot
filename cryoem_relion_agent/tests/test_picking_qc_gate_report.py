@@ -16,6 +16,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from app.scheduler import Scheduler
+from schemas.action_history import ActionHistoryEntry
 from schemas.sample_state import SampleState
 from tests.helpers.fixture_projects import build_fixture_project
 
@@ -116,6 +117,45 @@ class TestPickingQCGateReport(unittest.TestCase):
                 len(history_after),
                 msg="generate_report must not append action_history",
             )
+
+    def test_picking_backend_in_report_is_topaz_even_when_history_has_relion_log(self) -> None:
+        """If a later relion_log dry-run is logged in action_history, the report must
+        still attribute the failed Picking QC to the Topaz execution that produced it."""
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            proj = build_fixture_project(root, "picking_ready")
+            _seed_failed_topaz_state(proj)
+
+            sched = Scheduler(project_root=proj)
+            # Seed action_history with a later relion_log dry-run that would otherwise
+            # poison _extract_picking_backend's history fallback.
+            sched.history_manager.add_action_to_history(
+                ActionHistoryEntry(
+                    run_id="later_run",
+                    stage="CtfFind",
+                    action_name="run_autopick",
+                    branch_name="main",
+                    decision_reason="dry-run sanity",
+                    execution_status="decided",
+                    output_summary="policy decided run_autopick (picking_backend=relion_log)",
+                )
+            )
+
+            out_md = proj / "report.md"
+            report = sched.generate_report(out_md=out_md, refresh_state=False)
+
+            self.assertEqual(report.next_action.name.value, "request_human_review")
+            self.assertEqual(report.extra.get("picking_backend"), "topaz")
+
+            md = out_md.read_text(encoding="utf-8")
+            self.assertIn("Picking QC Gate", md)
+            self.assertIn("Picking backend: topaz", md)
+            self.assertIn("Backend: topaz", md)
+            # Compact gate section contributes "Status: failed_qc" and the rec.
+            self.assertIn("threshold_sweep_or_train_topaz", md)
+            # The Picking QC section's Backend: must NOT be relion_log.
+            qc_section = md.split("## Picking QC", 1)[-1]
+            self.assertNotIn("Backend: relion_log", qc_section)
 
     def test_scan_project_preserves_last_execution_from_persisted_state(self) -> None:
         with TemporaryDirectory() as tmp:
