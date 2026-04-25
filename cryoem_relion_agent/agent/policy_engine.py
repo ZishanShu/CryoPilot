@@ -28,6 +28,7 @@ DEFAULT_POLICY_RULES: Dict[str, Any] = {
     "priorities": {
         "request_human_review": 95,
         "run_cryodrgn": 94,
+        "run_cryodrgn_ai": 67,
         "run_autopick": 78,
         "run_extract": 74,
         "run_class2d": 71,
@@ -54,6 +55,12 @@ DEFAULT_POLICY_RULES: Dict[str, Any] = {
         "default_backend": "human_review",
         "allowed_backends": ["human_review", "cryodrgn"],
         "project_overrides": {},
+    },
+    "reconstruction": {
+        "default_backend": "relion",
+        "allowed_backends": ["relion", "cryodrgn_ai"],
+        "project_overrides": {},
+        "heterogeneity_threshold": 0.7,
     },
     "model_building": {
         "default_backend": "modelangelo",
@@ -168,7 +175,7 @@ class PolicyEngine:
 
             loaded = yaml.safe_load(rules_path.read_text(encoding="utf-8")) or {}
             merged = deepcopy(DEFAULT_POLICY_RULES)
-            for key in ("thresholds", "priorities", "picking", "heterogeneity", "model_building"):
+            for key in ("thresholds", "priorities", "picking", "heterogeneity", "reconstruction", "model_building"):
                 base = DEFAULT_POLICY_RULES.get(key, {})
                 extra = loaded.get(key, {})
                 if key == "picking":

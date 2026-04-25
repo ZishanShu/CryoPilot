@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
-from agent.backend_registry import model_action_to_backend, model_building_backend_to_action_name
 from agent.backend_registry import get_backend_capability_matrix
+from agent.backend_registry import model_action_to_backend, model_building_backend_to_action_name
 from agent.model_building_preflight import preflight_model_building
 from agent.heterogeneity_preflight import enrich_and_preflight_cryodrgn_params
 from agent.picking_preflight import enrich_and_preflight_topaz_params
@@ -24,6 +24,7 @@ from relion.relion_actions import RelionActionExecutor
 from schemas.action import Action, ActionName
 from schemas.action_history import ActionHistoryEntry
 from schemas.report import PipelineReport
+from policies.reconstruction_policy import ReconstructionPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ class Scheduler:
         self.qc_extractor = QCExtractor()
         self.policy_engine = PolicyEngine(self.config_dir / "policy_rules.yaml")
         self.structure_router = StructureRouter(self.config_dir / "router_rules.yaml")
+        self.reconstruction_policy = ReconstructionPolicy(self.policy_engine.rules)
         self.action_executor = RelionActionExecutor(self.config_dir / "schemes.yaml")
         self.state_manager = StateManager(self.state_file)
         self.history_manager = ActionHistoryManager(self.history_file)
@@ -67,6 +69,8 @@ class Scheduler:
             return "heterogeneity"
         if action_name in {"run_cryodrgn"}:
             return "heterogeneity"
+        if action_name in {"run_cryodrgn_ai"}:
+            return "reconstruction"
         if action_name in {"run_modelangelo"}:
             return "modelangelo"
         if action_name in {"run_emodelx"}:
@@ -130,6 +134,19 @@ class Scheduler:
             sd = action.parameters["heterogeneity_selection_decision"] or {}
             if sd.get("selection_reason"):
                 tags.append(f"heterogeneity_selection_reason={str(sd.get('selection_reason'))[:80]}")
+        reconstruction_backend = str(action.parameters.get("reconstruction_backend", "")).strip()
+        if reconstruction_backend:
+            tags.append(f"selected_backend={reconstruction_backend}")
+        if isinstance(action.parameters.get("reconstruction_selection_decision"), dict):
+            sd = action.parameters["reconstruction_selection_decision"] or {}
+            if sd.get("selection_reason"):
+                tags.append(f"selection_reason={str(sd.get('selection_reason'))[:80]}")
+        command_manifest = str(action.parameters.get("command_manifest", "")).strip()
+        if command_manifest:
+            tags.append(f"command_manifest={command_manifest[:120]}")
+        execution_mode = str(action.parameters.get("execution_mode", "")).strip()
+        if action.name == ActionName.RUN_CRYODRGN_AI and execution_mode:
+            tags.append(f"execution_mode={execution_mode}")
         model_building_backend = str(action.parameters.get("model_building_backend", "")).strip()
         if model_building_backend:
             tags.append(f"model_building_backend={model_building_backend}")
@@ -381,6 +398,67 @@ class Scheduler:
             result["picking_qc_error"] = str(exc)
         result["metadata"] = md
 
+    def _maybe_reconstruction_action(self, state, qc, modeling_context: Optional[ModelingContext] = None) -> Optional[Action]:
+        """Optionally route reconstruction to cryodrgn_ai; RELION remains default."""
+
+        ctx: Dict[str, Any] = {}
+        last = state.last_execution if isinstance(getattr(state, "last_execution", None), dict) else {}
+        if isinstance(last, dict):
+            cfg = last.get("reconstruction_context")
+            if isinstance(cfg, dict):
+                ctx.update(cfg)
+        if modeling_context is not None:
+            raw_ctx = getattr(modeling_context, "reconstruction_context", None)
+            if isinstance(raw_ctx, dict):
+                ctx.update(raw_ctx)
+        decision = self.reconstruction_policy.select(state, qc, context=ctx)
+        if decision.get("selected_backend") != "cryodrgn_ai":
+            return None
+        resolved, note = self.policy_engine.backend_registry.resolve("reconstruction", "cryodrgn_ai", state.project_id)
+        if resolved != "cryodrgn_ai":
+            return None
+        if note:
+            decision = {**decision, "registry_note": note}
+        params: Dict[str, Any] = {
+            "project_path": state.project_path,
+            "datadir": state.project_path,
+            "branch_name": "reconstruction",
+            "reconstruction_backend": "cryodrgn_ai",
+            "selected_backend": "cryodrgn_ai",
+            "selection_reason": decision.get("selection_reason"),
+            "reconstruction_selection_decision": decision,
+            "execution_mode": ctx.get("execution_mode", "dry_run"),
+            "run_dir": str(Path(state.project_path) / "CryoDRGN_AI" / "job_agent"),
+        }
+        for key in (
+            "particles_star_or_mrcs",
+            "particles_star_path",
+            "particles_mrcs_path",
+            "ctf_metadata",
+            "ctf_pkl_path",
+            "datadir",
+            "apix",
+            "box_size",
+            "downsample_box",
+            "zdim",
+            "gpu_id",
+            "num_epochs",
+            "max_particles",
+            "cryodrgn_executable",
+            "require_gpu",
+            "output_dir",
+            "run_dir",
+        ):
+            if key in ctx and ctx[key] not in (None, ""):
+                params[key] = ctx[key]
+        return Action(
+            name=ActionName.RUN_CRYODRGN_AI,
+            reason=f"Selected cryodrgn_ai reconstruction ({decision.get('selection_reason')}).",
+            parameters=params,
+            priority=int(self.policy_engine.rules.get("priorities", {}).get("run_cryodrgn_ai", 67)),
+        )
+
+
     def _resolve_next_action(
         self,
         state,
@@ -391,12 +469,17 @@ class Scheduler:
         picking_overrides: Optional[Dict[str, Any]] = None,
     ) -> Action:
         """Apply policy; if it delegates structure routing, call ``StructureRouter``."""
+        reconstruction_action = self._maybe_reconstruction_action(state, qc, modeling_context=modeling_context)
+        if reconstruction_action is not None:
+            return reconstruction_action
+
         action = self.policy_engine.decide_next_action(
             state,
             qc,
             log_history=log_history,
             preferred_picking_backend=preferred_picking_backend,
         )
+
         if action is not None:
             if action.name == ActionName.RUN_AUTOPICK:
                 if picking_overrides:

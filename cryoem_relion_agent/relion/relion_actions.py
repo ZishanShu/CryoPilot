@@ -9,6 +9,8 @@ from typing import Any, Dict, Mapping, Optional, Sequence
 from agent.heterogeneity_preflight import enrich_and_preflight_cryodrgn_params
 from agent.model_building_preflight import preflight_model_building
 from agent.picking_preflight import enrich_and_preflight_topaz_params
+from backends.reconstruction.cryodrgn_ai_backend import run as run_cryodrgn_ai_backend
+from backends.reconstruction.cryodrgn_ai_backend import update_state as update_cryodrgn_ai_state
 from relion.cryodrgn_runner import run_cryodrgn_pipeline
 from relion.emodelx_runner import run_emodelx_pipeline
 from relion.mica_runner import run_mica_pipeline
@@ -709,6 +711,61 @@ class RelionActionExecutor:
                     out_cd["command"] = " | ".join(str(c) for c in cmds)[:4000]
                 _merge_heterogeneity_preflight_fields(out_cd, act)
                 return out_cd
+
+            if name == "run_cryodrgn_ai":
+                params = dict(action.parameters or {})
+                run_dir = Path(
+                    str(
+                        params.get("run_dir")
+                        or params.get("output_dir")
+                        or project_root / "CryoDRGN_AI" / "job_agent"
+                    )
+                )
+                params.setdefault("execution_mode", "dry_run" if dry_run else "real")
+                params.setdefault("project_path", str(project_root))
+                params.setdefault("datadir", str(project_root))
+                if not params.get("particles_star_or_mrcs") and params.get("particles_star_path"):
+                    params["particles_star_or_mrcs"] = params["particles_star_path"]
+                if not params.get("particles_star_or_mrcs") and params.get("particles_mrcs_path"):
+                    params["particles_star_or_mrcs"] = params["particles_mrcs_path"]
+                if not params.get("ctf_metadata") and params.get("ctf_pkl_path"):
+                    params["ctf_metadata"] = params["ctf_pkl_path"]
+                res = run_cryodrgn_ai_backend(params, run_dir)
+                artifacts = res.get("output_artifacts") if isinstance(res.get("output_artifacts"), dict) else {}
+                out_ai: Dict[str, Any] = {
+                    "action_name": name,
+                    "status": res.get("status"),
+                    "dry_run": dry_run,
+                    "success": bool(res.get("success")),
+                    "selected_backend": "cryodrgn_ai",
+                    "reconstruction_backend": "cryodrgn_ai",
+                    "selection_reason": params.get("selection_reason"),
+                    "execution_mode": res.get("execution_mode"),
+                    "command_manifest": res.get("command_manifest") or artifacts.get("command_manifest"),
+                    "commands": res.get("commands"),
+                    "command": " | ".join(
+                        " ".join(str(x) for x in (c.get("argv") or []))
+                        for c in (res.get("commands") or [])
+                        if isinstance(c, dict)
+                    )[:4000],
+                    "output_dir": artifacts.get("run_dir") or str(run_dir),
+                    "output_artifacts": artifacts,
+                    "stdout_log": res.get("stdout_log") or artifacts.get("stdout_log"),
+                    "stderr_log": res.get("stderr_log") or artifacts.get("stderr_log"),
+                    "return_code": res.get("return_code"),
+                    "blocked_reason": res.get("blocked_reason"),
+                    "failed_reason": res.get("failed_reason"),
+                    "error_message": res.get("blocked_reason") or res.get("failed_reason"),
+                    "cryodrgn_ai_preflight": res.get("preflight"),
+                    "recommended_downstream_action": (
+                        "sample representative latent volumes and route candidate maps to model-building backends"
+                    ),
+                    "reason": action.reason,
+                    "priority": action.priority,
+                }
+                if state is not None:
+                    update_cryodrgn_ai_state(state, out_ai)
+                return out_ai
 
             if name == "request_human_review":
                 params = action.parameters or {}

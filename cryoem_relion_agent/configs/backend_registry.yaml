@@ -16,6 +16,13 @@ heterogeneity:
     - cryodrgn
   project_overrides: {}
 
+reconstruction:
+  default_backend: relion
+  allowed_backends:
+    - relion
+    - cryodrgn_ai
+  project_overrides: {}
+
 model_building:
   default_backend: modelangelo
   allowed_backends:

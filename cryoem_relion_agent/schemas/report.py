@@ -77,6 +77,10 @@ class PipelineReport(BaseModel):
         default=None,
         description="Structured cryoDRGN heterogeneity preflight (availability, execution_mode, blocked_reason, ...).",
     )
+    reconstruction_preflight: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Structured reconstruction preflight for optional backends such as cryodrgn_ai.",
+    )
     capability_matrix: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     backend_selection: Dict[str, Optional[Dict[str, Any]]] = Field(default_factory=dict)
     benchmark_summary: Optional[Dict[str, Any]] = None
@@ -171,6 +175,29 @@ class PipelineReport(BaseModel):
                 lines.append(f"- Heterogeneity blocked reason: {self.extra.get('heterogeneity_blocked_reason')}")
             if self.extra.get("cryodrgn_executable"):
                 lines.append(f"- cryoDRGN executable: {self.extra.get('cryodrgn_executable')}")
+        if self.extra.get("reconstruction_backend"):
+            lines.append(f"- Reconstruction backend: {self.extra.get('reconstruction_backend')}")
+        if self.extra.get("reconstruction_selection_reason"):
+            lines.append(f"- Reconstruction selection reason: {self.extra.get('reconstruction_selection_reason')}")
+        rf = self.reconstruction_preflight
+        if rf:
+            lines.append(f"- cryodrgn_ai preflight: {'available' if rf.get('available') else 'unavailable'}")
+            if rf.get("execution_mode"):
+                lines.append(f"- Reconstruction execution mode: {rf['execution_mode']}")
+            if rf.get("blocked_reason"):
+                lines.append(f"- Reconstruction blocked reason: {rf['blocked_reason']}")
+            if rf.get("executable_path"):
+                lines.append(f"- cryodrgn_ai executable: {rf['executable_path']}")
+        for key, label in (
+            ("command_manifest", "Command manifest"),
+            ("stdout_log", "stdout log"),
+            ("stderr_log", "stderr log"),
+            ("output_artifacts", "Output artifacts"),
+        ):
+            if self.extra.get(key):
+                lines.append(f"- {label}: {self.extra.get(key)}")
+        if self.extra.get("recommended_downstream_action"):
+            lines.append(f"- Recommended downstream action: {self.extra.get('recommended_downstream_action')}")
         if self.extra.get("model_building_backend"):
             lines.append(f"- Model-building backend: {self.extra.get('model_building_backend')}")
         if self.extra.get("model_selection_reason"):
@@ -298,6 +325,14 @@ class PipelineReport(BaseModel):
             lines.append(f"- Return code: {self.execution.return_code}")
             lines.append(f"- Output dir: {self.execution.output_dir or 'N/A'}")
             lines.append(f"- Generated model: {self.execution.generated_model_path or 'N/A'}")
+            le = self.state.last_execution or {}
+            if isinstance(le, dict) and le.get("action_name") == "run_cryodrgn_ai":
+                if le.get("stdout_log"):
+                    lines.append(f"- stdout log: {le.get('stdout_log')}")
+                if le.get("stderr_log"):
+                    lines.append(f"- stderr log: {le.get('stderr_log')}")
+                if le.get("output_artifacts"):
+                    lines.append(f"- Output artifacts: {le.get('output_artifacts')}")
             if self.execution.error_message:
                 lines.append(f"- Error: {self.execution.error_message}")
         else:

@@ -70,8 +70,16 @@ class Reporter:
         "heterogeneity_selection_reason",
     )
 
+    _RECONSTRUCTION_TAG_KEYS: tuple[str, ...] = (
+        "reconstruction_backend",
+        "selected_backend",
+        "reconstruction_selection_reason",
+        "command_manifest",
+        "execution_mode",
+    )
+
     _ALL_SUMMARY_TAG_KEYS: tuple[str, ...] = (
-        _PICKING_TAG_KEYS + _MODEL_BUILDING_TAG_KEYS + _HETEROGENEITY_TAG_KEYS
+        _PICKING_TAG_KEYS + _MODEL_BUILDING_TAG_KEYS + _HETEROGENEITY_TAG_KEYS + _RECONSTRUCTION_TAG_KEYS
     )
 
     @staticmethod
@@ -337,6 +345,46 @@ class Reporter:
         return None
 
     @staticmethod
+    def _extract_reconstruction_backend(
+        next_action: Optional[Action],
+        history: Sequence[ActionHistoryEntry],
+    ) -> Optional[str]:
+        if next_action and next_action.name.value == "run_cryodrgn_ai":
+            v = str(next_action.parameters.get("reconstruction_backend", "")).strip()
+            if v:
+                return v
+        for item in reversed(list(history)):
+            if item.action_name != "run_cryodrgn_ai":
+                continue
+            text = str(item.output_summary or "")
+            v = Reporter._parse_parenthesized_tag(text, "reconstruction_backend") or Reporter._parse_parenthesized_tag(text, "selected_backend")
+            if v:
+                return v
+        return None
+
+    @staticmethod
+    def _extract_cryodrgn_ai_preflight(
+        next_action: Optional[Action],
+        history: Sequence[ActionHistoryEntry],
+    ) -> Optional[Dict[str, Any]]:
+        if next_action and isinstance(next_action.parameters, dict) and next_action.name.value == "run_cryodrgn_ai":
+            raw = next_action.parameters.get("cryodrgn_ai_preflight")
+            if isinstance(raw, dict):
+                return raw
+        for item in reversed(list(history)):
+            if item.action_name != "run_cryodrgn_ai":
+                continue
+            text = str(item.output_summary or "")
+            selected = Reporter._parse_parenthesized_tag(text, "reconstruction_backend") or Reporter._parse_parenthesized_tag(text, "selected_backend")
+            if selected:
+                return {
+                    "backend_name": selected,
+                    "command_manifest": Reporter._parse_parenthesized_tag(text, "command_manifest"),
+                    "execution_mode": Reporter._parse_parenthesized_tag(text, "execution_mode"),
+                }
+        return None
+
+    @staticmethod
     def _extract_model_building_backend(
         next_action: Optional[Action],
         history: Sequence[ActionHistoryEntry],
@@ -399,9 +447,11 @@ class Reporter:
         )
         heterogeneity_backend = self._extract_heterogeneity_backend(next_action=next_action, history=report_history)
         model_building_backend = self._extract_model_building_backend(next_action=next_action, history=report_history)
+        reconstruction_backend = self._extract_reconstruction_backend(next_action=next_action, history=report_history)
         mb_preflight = self._extract_model_building_preflight(next_action=next_action, history=report_history)
         pk_preflight = self._extract_picking_preflight(next_action=next_action, history=report_history)
         het_preflight = self._extract_heterogeneity_preflight(next_action=next_action, history=report_history)
+        cryodrgn_ai_preflight = self._extract_cryodrgn_ai_preflight(next_action=next_action, history=report_history)
         extra: Dict[str, str] = {}
         if picking_backend:
             extra["picking_backend"] = picking_backend
@@ -409,6 +459,8 @@ class Reporter:
             extra["heterogeneity_backend"] = heterogeneity_backend
         if model_building_backend:
             extra["model_building_backend"] = model_building_backend
+        if reconstruction_backend:
+            extra["reconstruction_backend"] = reconstruction_backend
         if mb_preflight:
             extra["model_building_availability"] = "available" if mb_preflight.get("available") else "unavailable"
             if mb_preflight.get("execution_mode"):
@@ -452,6 +504,11 @@ class Reporter:
                 extra["heterogeneity_selection_reason"] = str(hs.get("selection_reason"))
             if isinstance(ms, dict) and ms.get("selection_reason"):
                 extra["model_selection_reason"] = str(ms.get("selection_reason"))
+            rs = next_action.parameters.get("reconstruction_selection_decision")
+            if isinstance(rs, dict) and rs.get("selection_reason"):
+                extra["reconstruction_selection_reason"] = str(rs.get("selection_reason"))
+            if next_action.parameters.get("command_manifest"):
+                extra["command_manifest"] = str(next_action.parameters.get("command_manifest"))
         if het_preflight:
             extra["heterogeneity_availability"] = "available" if het_preflight.get("available") else "unavailable"
             if het_preflight.get("execution_mode"):
@@ -461,6 +518,20 @@ class Reporter:
             hex_p = het_preflight.get("executable_path")
             if hex_p:
                 extra["cryodrgn_executable"] = str(hex_p)[:500]
+        if cryodrgn_ai_preflight:
+            extra["cryodrgn_ai_preflight_result"] = "available" if cryodrgn_ai_preflight.get("available") else "unavailable"
+            if cryodrgn_ai_preflight.get("execution_mode"):
+                extra["reconstruction_execution_mode"] = str(cryodrgn_ai_preflight["execution_mode"])
+            if cryodrgn_ai_preflight.get("blocked_reason"):
+                extra["reconstruction_blocked_reason"] = str(cryodrgn_ai_preflight["blocked_reason"])
+        if state.last_execution and isinstance(state.last_execution, dict):
+            le = state.last_execution
+            if le.get("action_name") == "run_cryodrgn_ai":
+                for key in ("command_manifest", "stdout_log", "stderr_log", "recommended_downstream_action"):
+                    if le.get(key):
+                        extra[key] = str(le[key])[:1000]
+                if le.get("output_artifacts"):
+                    extra["output_artifacts"] = str(le.get("output_artifacts"))[:1000]
 
         picking_qc: Optional[Dict[str, Any]] = None
         if state.last_execution:
@@ -491,10 +562,13 @@ class Reporter:
             picking_preflight=pk_preflight,
             picking_qc=picking_qc,
             heterogeneity_preflight=het_preflight,
+            cryodrgn_ai_preflight=cryodrgn_ai_preflight,
+            reconstruction_preflight=cryodrgn_ai_preflight,
             capability_matrix=capability_matrix or {},
             backend_selection={
                 "picking": (next_action.parameters.get("picking_selection_decision") if next_action and isinstance(next_action.parameters, dict) else None),
                 "heterogeneity": (next_action.parameters.get("heterogeneity_selection_decision") if next_action and isinstance(next_action.parameters, dict) else None),
+                "reconstruction": (next_action.parameters.get("reconstruction_selection_decision") if next_action and isinstance(next_action.parameters, dict) else None),
                 "model_building": (next_action.parameters.get("model_building_selection_decision") if next_action and isinstance(next_action.parameters, dict) else None),
             },
             benchmark_summary=benchmark_summary,
