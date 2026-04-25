@@ -6,6 +6,7 @@ thresholds:
 priorities:
   request_human_review: 95
   run_cryodrgn: 94
+  run_cryodrgn_ai: 93
   run_autopick: 78
   run_extract: 74
   run_class2d: 71
@@ -31,6 +32,12 @@ picking:
 heterogeneity:
   default_backend: human_review
   allowed_backends: [human_review, cryodrgn]
+  project_overrides: {}
+
+reconstruction:
+  default_backend: relion
+  allowed_backends: [relion, cryodrgn_ai]
+  heterogeneity_threshold: 0.7
   project_overrides: {}
 
 model_building:

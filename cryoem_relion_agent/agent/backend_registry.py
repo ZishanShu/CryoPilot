@@ -9,6 +9,11 @@ from typing import Any, Dict, Optional, Tuple
 
 import yaml
 
+from backends.reconstruction.cryodrgn_ai_contract import (
+    CRYODRGN_AI_BACKEND_METADATA,
+    CRYODRGN_AI_INPUT_CONTRACT,
+)
+
 logger = logging.getLogger(__name__)
 
 # Unified input contract per model_building backend (single source for preflight + registry).
@@ -182,6 +187,37 @@ for _hbid, _hmeta in HETEROGENEITY_BACKEND_METADATA.items():
     _hmeta["required_fields"] = list(_hsp.get("required_fields", ()))
     _hmeta["optional_fields"] = list(_hsp.get("optional_fields", ()))
 
+RECONSTRUCTION_INPUT_SPECS: Dict[str, Dict[str, Any]] = {
+    "relion": {
+        "backend_name": "relion",
+        "required_fields": (),
+        "optional_fields": ("particles_star_path", "initial_model_path", "map_path", "output_dir"),
+        "defaults": {},
+    },
+    "cryodrgn_ai": {
+        "backend_name": "cryodrgn_ai",
+        "required_fields": tuple(CRYODRGN_AI_INPUT_CONTRACT["required_inputs"]),
+        "optional_fields": tuple(CRYODRGN_AI_INPUT_CONTRACT["optional_inputs"]),
+        "defaults": {},
+    },
+}
+
+RECONSTRUCTION_BACKEND_METADATA: Dict[str, Dict[str, Any]] = {
+    "relion": {
+        "backend_name": "relion",
+        "category": "reconstruction",
+        "subcategory": "relion_initial_model_refinement",
+        "capability_summary": "RELION-native initial model, 3D classification, and refinement path",
+        "execution_modes": ["dry_run", "real"],
+    },
+    "cryodrgn_ai": dict(CRYODRGN_AI_BACKEND_METADATA),
+}
+
+for _rbid, _rmeta in RECONSTRUCTION_BACKEND_METADATA.items():
+    _rsp = RECONSTRUCTION_INPUT_SPECS.get(_rbid, {})
+    _rmeta["required_fields"] = list(_rsp.get("required_fields", ()))
+    _rmeta["optional_fields"] = list(_rsp.get("optional_fields", ()))
+
 DEFAULT_DOMAINS: Dict[str, Dict[str, Any]] = {
     "picking": {
         "default_backend": "relion_log",
@@ -190,7 +226,12 @@ DEFAULT_DOMAINS: Dict[str, Dict[str, Any]] = {
     },
     "heterogeneity": {
         "default_backend": "human_review",
-        "allowed_backends": ["human_review", "cryodrgn"],
+        "allowed_backends": ["human_review", "cryodrgn", "cryodrgn_ai"],
+        "project_overrides": {},
+    },
+    "reconstruction": {
+        "default_backend": "relion",
+        "allowed_backends": ["relion", "cryodrgn_ai"],
         "project_overrides": {},
     },
     "model_building": {
@@ -295,6 +336,44 @@ BACKEND_CAPABILITY_OVERRIDES: Dict[str, Dict[str, Any]] = {
         "supports_consensus_pose": True,
         "notes": "Preferred when STAR/pose/ctf are available.",
     },
+    "cryodrgn_ai": {
+        "category": "reconstruction",
+        "subcategory": "neural_abinitio_heterogeneity",
+        "maturity_level": "real",
+        "execution_mode_supported": ["dry_run", "real"],
+        "required_inputs": ["particles_star_or_mrcs", "ctf_metadata"],
+        "optional_inputs": [
+            "datadir",
+            "apix",
+            "box_size",
+            "downsample_box",
+            "zdim",
+            "gpu_id",
+            "num_epochs",
+            "max_particles",
+        ],
+        "required_dependencies": ["cryodrgn_executable", "cryodrgn abinit"],
+        "optional_dependencies": ["gpu"],
+        "primary_outputs": [
+            "run_dir",
+            "command_manifest",
+            "stdout_log",
+            "stderr_log",
+            "latent_embeddings",
+            "model_weights",
+            "sampled_volumes",
+        ],
+        "typical_use_case": "Neural ab-initio reconstruction when RELION initial model/classification is unreliable",
+        "upstream_assumptions": ["particles.star+datadir+apix+box_size or particles.mrcs+ctf.pkl"],
+        "fallback_candidates": ["relion_initial_model", "relion_3d_classification", "human_review"],
+        "supports_gpu": True,
+        "supports_af3_prior": False,
+        "supports_sequence_input": False,
+        "supports_map_input": False,
+        "supports_particle_input": True,
+        "supports_consensus_pose": False,
+        "notes": "Optional reconstruction / heterogeneity branch; RELION remains the default path.",
+    },
     "modelangelo": {
         "maturity_level": "real",
         "execution_mode_supported": ["real"],
@@ -366,12 +445,12 @@ class BackendRegistry:
         if registry_yaml and registry_yaml.exists():
             try:
                 data = yaml.safe_load(registry_yaml.read_text(encoding="utf-8")) or {}
-                for key in ("picking", "heterogeneity", "model_building"):
+                for key in ("picking", "heterogeneity", "reconstruction", "model_building"):
                     if isinstance(data.get(key), dict):
                         merged[key] = {**merged.get(key, {}), **data[key]}
             except (OSError, yaml.YAMLError) as exc:
                 logger.warning("Could not load backend_registry.yaml: %s", exc)
-        for key in ("picking", "heterogeneity", "model_building"):
+        for key in ("picking", "heterogeneity", "reconstruction", "model_building"):
             sec = policy_rules.get(key) if isinstance(policy_rules, dict) else None
             if isinstance(sec, dict) and sec:
                 merged[key] = {**merged.get(key, {}), **sec}
@@ -393,7 +472,16 @@ class BackendRegistry:
         if domain == "picking":
             return s if s in {"topaz", "cryolo", "relion_log"} else None
         if domain == "heterogeneity":
-            return s if s in {"human_review", "cryodrgn"} else None
+            return s if s in {"human_review", "cryodrgn", "cryodrgn_ai"} else None
+        if domain == "reconstruction":
+            alias = {
+                "relion_initial_model": "relion",
+                "relion_3d_classification": "relion",
+                "run_cryodrgn_ai": "cryodrgn_ai",
+            }
+            if s in {"relion", "cryodrgn_ai"}:
+                return s
+            return alias.get(s)
         if domain == "model_building":
             if s in {"modelangelo", "emodelx", "mica"}:
                 return s
@@ -487,16 +575,23 @@ def iter_model_building_backend_ids() -> Tuple[str, ...]:
     return ("modelangelo", "emodelx", "mica")
 
 
+def iter_reconstruction_backend_ids() -> Tuple[str, ...]:
+    """Stable ordering for reconstruction registry / tests."""
+    return ("relion", "cryodrgn_ai")
+
+
 def get_backend_capability_matrix() -> Dict[str, Dict[str, Any]]:
     """Unified backend capability matrix for selection/report/benchmark."""
     matrix: Dict[str, Dict[str, Any]] = {}
     specs_by_name: Dict[str, Dict[str, Any]] = {}
     specs_by_name.update(PICKING_INPUT_SPECS)
     specs_by_name.update(HETEROGENEITY_INPUT_SPECS)
+    specs_by_name.update(RECONSTRUCTION_INPUT_SPECS)
     specs_by_name.update(MODEL_BUILDING_INPUT_SPECS)
     metadata_by_name: Dict[str, Dict[str, Any]] = {}
     metadata_by_name.update(PICKING_BACKEND_METADATA)
     metadata_by_name.update(HETEROGENEITY_BACKEND_METADATA)
+    metadata_by_name.update(RECONSTRUCTION_BACKEND_METADATA)
     metadata_by_name.update(MODEL_BUILDING_BACKEND_METADATA)
     for name, override in BACKEND_CAPABILITY_OVERRIDES.items():
         spec = specs_by_name.get(name, {})
