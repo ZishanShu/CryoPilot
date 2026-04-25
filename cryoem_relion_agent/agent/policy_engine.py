@@ -292,6 +292,86 @@ class PolicyEngine:
                 return qc
         return None
 
+    @staticmethod
+    def _last_execution_dict(state: SampleState) -> Optional[Dict[str, Any]]:
+        le = getattr(state, "last_execution", None)
+        if isinstance(le, dict):
+            return le
+        if le is None:
+            return None
+        try:
+            return vars(le)
+        except TypeError:
+            return None
+
+    @staticmethod
+    def _last_execution_picking_backend(le: Dict[str, Any]) -> str:
+        for key in ("picking_backend",):
+            v = le.get(key)
+            if isinstance(v, str) and v.strip():
+                return v.strip().lower()
+        md = le.get("metadata")
+        if isinstance(md, dict):
+            v = md.get("picking_backend")
+            if isinstance(v, str) and v.strip():
+                return v.strip().lower()
+        params = le.get("parameters")
+        if isinstance(params, dict):
+            v = params.get("picking_backend")
+            if isinstance(v, str) and v.strip():
+                return v.strip().lower()
+        return ""
+
+    def _build_picking_qc_gate_action(
+        self,
+        state: SampleState,
+        priorities: Dict[str, int],
+    ) -> Optional[Action]:
+        """If the latest Topaz autopick run reports failed_qc, build the gate action.
+
+        Returns ``None`` when the gate must not fire (no Topaz picking execution,
+        no picking_qc, or qc_status != failed_qc).
+        """
+        le = self._last_execution_dict(state)
+        if not le:
+            return None
+        action_name = str(le.get("action_name") or "").strip().lower()
+        if action_name and action_name != "run_autopick":
+            return None
+        backend = self._last_execution_picking_backend(le)
+        if backend and backend != "topaz":
+            return None
+        picking_qc = self._extract_latest_picking_qc(state)
+        if not isinstance(picking_qc, dict):
+            return None
+        if picking_qc.get("qc_status") != "failed_qc":
+            return None
+        flags = list(picking_qc.get("qc_flags") or [])
+        rec = str(picking_qc.get("recommended_next_action") or "manual_review")
+        reason_flags = ", ".join(flags) if flags else "unknown"
+        ge = picking_qc.get("ground_truth_evaluation") or {}
+        return Action(
+            name=ActionName.REQUEST_HUMAN_REVIEW,
+            reason=(
+                f"Picking QC failed after Topaz: {reason_flags}. "
+                f"Recommended recovery: {rec}."
+            ),
+            parameters={
+                "branch_name": "picking_qc",
+                "picking_backend": "topaz",
+                "picking_qc_status": str(picking_qc.get("qc_status") or ""),
+                "picking_qc_flags": flags,
+                "recommended_next_action": rec,
+                "n_picks": picking_qc.get("n_picks"),
+                "n_micrographs_total": picking_qc.get("n_micrographs_total"),
+                "zero_pick_micrograph_ratio": picking_qc.get("zero_pick_micrograph_ratio"),
+                "precision": ge.get("precision"),
+                "recall": ge.get("recall"),
+                "f1": ge.get("f1"),
+            },
+            priority=priorities.get("request_human_review", 95),
+        )
+
     def decide_extract_stage(self, state: SampleState, qc: QCMetrics) -> Optional[Action]:
         priorities = self.rules["priorities"]
         if self._is_stage_at_least(state, "AutoPick") and not self._is_stage_at_least(state, "Extract"):
@@ -398,6 +478,13 @@ class PolicyEngine:
                 priority=priorities["run_import_preprocess"],
             ))
 
+        # Picking QC gate: runs before any picking/extract decision so that a
+        # filesystem scan still showing CtfFind cannot push us back to run_autopick
+        # after a Topaz run has already produced failed_qc.
+        gate_action = self._build_picking_qc_gate_action(state, priorities)
+        if gate_action is not None:
+            return ret(gate_action)
+
         upstream_picking = self.decide_picking_stage(
             state,
             qc,
@@ -408,33 +495,6 @@ class PolicyEngine:
 
         upstream_extract = self.decide_extract_stage(state, qc)
         if upstream_extract is not None:
-            picking_qc = self._extract_latest_picking_qc(state)
-            if isinstance(picking_qc, dict) and picking_qc.get("qc_status") == "failed_qc":
-                flags = list(picking_qc.get("qc_flags") or [])
-                rec = str(picking_qc.get("recommended_next_action") or "manual_review")
-                reason_flags = ", ".join(flags) if flags else "unknown"
-                ge = picking_qc.get("ground_truth_evaluation") or {}
-                return ret(Action(
-                    name=ActionName.REQUEST_HUMAN_REVIEW,
-                    reason=(
-                        f"Picking QC failed after Topaz: {reason_flags}. "
-                        f"Recommended recovery: {rec}."
-                    ),
-                    parameters={
-                        "branch_name": "picking_qc",
-                        "picking_backend": str(picking_qc.get("picking_backend") or "topaz"),
-                        "picking_qc_status": str(picking_qc.get("qc_status") or ""),
-                        "picking_qc_flags": flags,
-                        "recommended_next_action": rec,
-                        "n_picks": picking_qc.get("n_picks"),
-                        "n_micrographs_total": picking_qc.get("n_micrographs_total"),
-                        "zero_pick_micrograph_ratio": picking_qc.get("zero_pick_micrograph_ratio"),
-                        "precision": ge.get("precision"),
-                        "recall": ge.get("recall"),
-                        "f1": ge.get("f1"),
-                    },
-                    priority=priorities.get("request_human_review", 95),
-                ))
             return ret(upstream_extract)
 
         upstream_class2d = self.decide_class2d_stage(state, qc)

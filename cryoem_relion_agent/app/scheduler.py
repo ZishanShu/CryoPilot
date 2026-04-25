@@ -204,6 +204,16 @@ class Scheduler:
         elif persisted is not None and persisted.sequence_path:
             state.sequence_path = persisted.sequence_path
 
+        # Filesystem QC extraction never produces ``last_execution``; preserve it
+        # from the persisted state so policy gates that depend on prior execution
+        # results (e.g. picking_qc) survive across run-next/generate-report calls.
+        if (
+            persisted is not None
+            and getattr(persisted, "last_execution", None)
+            and not getattr(state, "last_execution", None)
+        ):
+            state.last_execution = persisted.last_execution
+
         if persist_state:
             self.state_manager.save_state(state)
         return state, qc
