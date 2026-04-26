@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
+from agent.candidate_map_router import create_candidate_map_routing_records, read_candidate_maps
 from schemas.action import Action
 from schemas.action_history import ActionHistoryEntry
 from schemas.qc_metrics import QCMetrics
@@ -395,6 +396,13 @@ class Reporter:
         pk_preflight = self._extract_picking_preflight(next_action=next_action, history=report_history)
         het_preflight = self._extract_heterogeneity_preflight(next_action=next_action, history=report_history)
         cryodrgn_ai_preflight = self._extract_cryodrgn_ai_preflight(next_action=next_action, history=report_history)
+        candidate_map_routing = []
+        if next_action and isinstance(next_action.parameters, dict):
+            raw_records = next_action.parameters.get("candidate_map_routing_records")
+            if isinstance(raw_records, list):
+                candidate_map_routing = [x for x in raw_records if isinstance(x, dict)]
+        if not candidate_map_routing:
+            candidate_map_routing = create_candidate_map_routing_records(state, max_candidates=5)
         extra: Dict[str, str] = {}
         if picking_backend:
             extra["picking_backend"] = picking_backend
@@ -404,6 +412,7 @@ class Reporter:
             extra["model_building_backend"] = model_building_backend
         if reconstruction_backend:
             extra["reconstruction_backend"] = reconstruction_backend
+        extra["candidate_map_count"] = str(len(read_candidate_maps(state)))
         if mb_preflight:
             extra["model_building_availability"] = "available" if mb_preflight.get("available") else "unavailable"
             if mb_preflight.get("execution_mode"):
@@ -495,6 +504,7 @@ class Reporter:
             heterogeneity_preflight=het_preflight,
             cryodrgn_ai_preflight=cryodrgn_ai_preflight,
             reconstruction_preflight=cryodrgn_ai_preflight,
+            candidate_map_routing=candidate_map_routing,
             capability_matrix=capability_matrix or {},
             backend_selection={
                 "picking": (next_action.parameters.get("picking_selection_decision") if next_action and isinstance(next_action.parameters, dict) else None),

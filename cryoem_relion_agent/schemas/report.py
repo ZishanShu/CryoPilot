@@ -77,6 +77,7 @@ class PipelineReport(BaseModel):
         default=None,
         description="Structured reconstruction preflight for optional backends such as cryodrgn_ai.",
     )
+    candidate_map_routing: List[Dict[str, Any]] = Field(default_factory=list)
     capability_matrix: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     backend_selection: Dict[str, Optional[Dict[str, Any]]] = Field(default_factory=dict)
     benchmark_summary: Optional[Dict[str, Any]] = None
@@ -222,6 +223,30 @@ class PipelineReport(BaseModel):
                 lines.append(f"- AF3 dir: {self.extra.get('mica_af3_dir')}")
             if self.extra.get("mica_output"):
                 lines.append(f"- Output path: {self.extra.get('mica_output')}")
+        lines.append("")
+        lines.append("## Candidate Map Routing")
+        candidate_count = int(self.extra.get("candidate_map_count", "0") or "0")
+        lines.append(f"- Candidate count: {candidate_count}")
+        if candidate_count:
+            lines.append(f"- cryodrgn_ai produced {candidate_count} candidate maps for downstream routing.")
+        if self.candidate_map_routing:
+            lines.append(f"- Routing records: {len(self.candidate_map_routing)}")
+            for record in self.candidate_map_routing[:5]:
+                pf = record.get("preflight") if isinstance(record.get("preflight"), dict) else {}
+                status = "available" if pf.get("available") else "unavailable"
+                lines.append(
+                    "- "
+                    f"candidate {record.get('candidate_index')}: "
+                    f"map={record.get('map_path') or 'N/A'} "
+                    f"backend={record.get('recommended_backend') or 'N/A'} "
+                    f"action={record.get('downstream_action') or 'N/A'} "
+                    f"preflight={status} "
+                    f"ready_for={record.get('recommended_backend') or 'ModelAngelo/EModelX/MICA'}"
+                )
+                if pf.get("blocked_reason"):
+                    lines.append(f"  - blocked_reason: {pf.get('blocked_reason')}")
+        else:
+            lines.append("- No candidate maps available for routing")
         lines.append("")
         lines.append("## Backend Capabilities")
         lines.append(f"- Backend entries: {len(self.capability_matrix)}")
