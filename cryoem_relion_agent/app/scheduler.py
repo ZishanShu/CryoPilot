@@ -15,6 +15,7 @@ from agent.candidate_map_router import (
     create_candidate_map_routing_records,
     read_candidate_maps,
 )
+from agent.candidate_map_batch_model_building import build_candidate_model_building_plan
 from agent.model_building_preflight import preflight_model_building
 from agent.heterogeneity_preflight import enrich_and_preflight_cryodrgn_params
 from agent.picking_preflight import enrich_and_preflight_topaz_params
@@ -525,9 +526,10 @@ class Scheduler:
             return None
 
         ctx = self._candidate_map_context(state, modeling_context)
+        max_candidates = int(ctx.get("max_candidates") or 5)
         records = create_candidate_map_routing_records(
             state,
-            max_candidates=int(ctx.get("max_candidates") or 5),
+            max_candidates=max_candidates,
             allow_seq_free=bool(ctx.get("allow_seq_free") or ctx.get("seq_free_allowed")),
             af3_dir=ctx.get("af3_dir"),
             output_root=ctx.get("output_root"),
@@ -550,6 +552,15 @@ class Scheduler:
         params["upstream_candidate_maps"] = copy.deepcopy(candidates)
         params["candidate_map_count"] = len(candidates)
         params["candidate_map_selected_count"] = len(records)
+        batch_top_k = max(0, int(ctx.get("batch_top_k") or max_candidates))
+        batch_plans = build_candidate_model_building_plan(
+            records,
+            top_k=batch_top_k,
+            dry_run=True,
+        )
+        params["candidate_map_batch_model_building_plans"] = batch_plans
+        params["candidate_map_batch_count"] = len(batch_plans)
+        params["candidate_map_batch_top_k"] = batch_top_k
         params.setdefault("routing_reason", selected.get("routing_reason"))
         priority = self.structure_router.rules.get("priorities", {}).get(str(action_name), 58)
         return Action(
@@ -613,6 +624,9 @@ class Scheduler:
             "selected_candidate_qc_score",
             "candidate_map_selection_reason",
             "ranked_candidate_maps",
+            "candidate_map_batch_model_building_plans",
+            "candidate_map_batch_count",
+            "candidate_map_batch_top_k",
         )
         for key in preserve_keys:
             if key in payload and payload.get(key) not in (None, "", [], {}):
@@ -651,6 +665,30 @@ class Scheduler:
                 payload["candidate_map_count"] = params.get("candidate_map_count")
             elif previous.get("candidate_map_count") is not None:
                 payload["candidate_map_count"] = previous.get("candidate_map_count")
+
+        if payload.get("candidate_map_batch_model_building_plans") is None:
+            merged_plans = self._candidate_value_or_none(
+                params.get("candidate_map_batch_model_building_plans"),
+                previous.get("candidate_map_batch_model_building_plans"),
+            )
+            if merged_plans is not None:
+                payload["candidate_map_batch_model_building_plans"] = merged_plans
+        if payload.get("candidate_map_batch_count") is None:
+            merged_count = self._candidate_value_or_none(
+                params.get("candidate_map_batch_count"),
+                previous.get("candidate_map_batch_count"),
+            )
+            if merged_count is not None:
+                payload["candidate_map_batch_count"] = merged_count
+            elif isinstance(payload.get("candidate_map_batch_model_building_plans"), list):
+                payload["candidate_map_batch_count"] = len(payload.get("candidate_map_batch_model_building_plans") or [])
+        if payload.get("candidate_map_batch_top_k") is None:
+            merged_top_k = self._candidate_value_or_none(
+                params.get("candidate_map_batch_top_k"),
+                previous.get("candidate_map_batch_top_k"),
+            )
+            if merged_top_k is not None:
+                payload["candidate_map_batch_top_k"] = merged_top_k
 
         return payload, copy.deepcopy(candidate_maps)
 
