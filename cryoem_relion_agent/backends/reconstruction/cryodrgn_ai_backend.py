@@ -41,6 +41,14 @@ def _params(state: Any) -> Dict[str, Any]:
         "abinit_command",
         "reconstruction_type",
         "output_dir",
+        # sampled-volume generation params
+        "sample_volumes",
+        "n_sampled_volumes",
+        "representative_z_path",
+        "sampled_volumes_dir",
+        "eval_vol_device",
+        "eval_vol_apix",
+        "eval_vol_box_size",
     ):
         if hasattr(state, name):
             data[name] = getattr(state, name)
@@ -279,6 +287,165 @@ def prepare_inputs(state: Any, run_dir: str | Path) -> Dict[str, Any]:
     }
 
 
+def sample_representative_latents(run_dir: Path, z_path: Path, n_volumes: int = 5) -> Path:
+    """Compute representative latent points via PCA (numpy SVD) and write to a txt file.
+
+    Returns the path to ``representative_z.txt`` suitable for ``cryodrgn eval_vol --zfile``.
+    Uses evenly-spaced quantiles along the first principal component so that the
+    selected points span the full latent distribution.
+    """
+    import pickle  # stdlib — no sklearn dependency
+
+    import numpy as np
+
+    with open(z_path, "rb") as fh:
+        z = pickle.load(fh)
+    if hasattr(z, "numpy"):
+        z = z.numpy()
+    z = np.asarray(z, dtype=float)
+    n_samples = z.shape[0]
+
+    if n_samples <= n_volumes:
+        selected_z = z
+    else:
+        z_centered = z - z.mean(axis=0)
+        _U, _s, Vt = np.linalg.svd(z_centered, full_matrices=False)
+        pc1 = Vt[0]
+        proj = z_centered @ pc1
+        sorted_idx = np.argsort(proj)
+        indices = [
+            sorted_idx[int(round(i * (n_samples - 1) / max(n_volumes - 1, 1)))]
+            for i in range(n_volumes)
+        ]
+        selected_z = z[indices]
+
+    run_path = Path(run_dir)
+    run_path.mkdir(parents=True, exist_ok=True)
+    rep_z_path = run_path / "representative_z.txt"
+    np.savetxt(str(rep_z_path), selected_z)
+    return rep_z_path
+
+
+def build_eval_vol_command(
+    executable: str,
+    weights_path: str,
+    config_path: str,
+    zfile_path: str,
+    out_dir: str,
+    *,
+    apix: Optional[float] = None,
+    box_size: Optional[int] = None,
+    device: Optional[str] = None,
+) -> List[str]:
+    """Return the argv list for ``cryodrgn eval_vol`` using ``--zfile`` (not ``--z``)."""
+    argv: List[str] = [
+        executable, "eval_vol", weights_path,
+        "--config", config_path,
+        "--zfile", zfile_path,
+        "-o", out_dir,
+    ]
+    if apix is not None:
+        argv.extend(["--Apix", str(apix)])
+    if box_size is not None:
+        argv.extend(["--box", str(box_size)])
+    if device is not None:
+        argv.extend(["--device", str(device)])
+    return argv
+
+
+def run_eval_vol(
+    params: Dict[str, Any],
+    run_dir: Path,
+    *,
+    abinit_dir: Optional[Path] = None,
+    dry_run: bool = False,
+) -> Dict[str, Any]:
+    """Sample representative latent points and run ``cryodrgn eval_vol``.
+
+    Returns a dict with status, representative_z_path, sampled_volumes_dir,
+    argv, and (in real mode) return_code / stdout_log / stderr_log.
+
+    Sets ``TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1`` in the subprocess env to avoid
+    PyTorch 2.6+ ``weights_only=True`` failures on trusted local cryoDRGN outputs.
+    """
+    abinit_path = abinit_dir if abinit_dir is not None else (run_dir / "abinit")
+    executable = _resolve_executable(params) or str(params.get("cryodrgn_executable") or "cryodrgn")
+    n_volumes = _as_int(params.get("n_sampled_volumes"), 5)
+
+    # Determine representative_z.txt path
+    z_path_override = params.get("representative_z_path")
+    if z_path_override and Path(str(z_path_override)).is_file():
+        rep_z_path = Path(str(z_path_override))
+    else:
+        z_pkl = abinit_path / "z.pkl"
+        if not z_pkl.is_file():
+            return {"status": "skipped", "reason": f"z.pkl not found at {z_pkl}"}
+        rep_z_path = sample_representative_latents(run_dir, z_pkl, n_volumes=n_volumes)
+
+    weights_pkl = abinit_path / "weights.pkl"
+    config_pkl = abinit_path / "config.pkl"
+    sampled_volumes_dir = str(params.get("sampled_volumes_dir") or (run_dir / "sampled_volumes"))
+    Path(sampled_volumes_dir).mkdir(parents=True, exist_ok=True)
+
+    apix = params.get("eval_vol_apix")
+    box_size = params.get("eval_vol_box_size")
+    device = params.get("eval_vol_device")
+    argv = build_eval_vol_command(
+        executable,
+        str(weights_pkl),
+        str(config_pkl),
+        str(rep_z_path),
+        sampled_volumes_dir,
+        apix=float(apix) if apix is not None else None,
+        box_size=int(box_size) if box_size is not None else None,
+        device=str(device) if device is not None else None,
+    )
+
+    if dry_run:
+        return {
+            "status": "dry_run",
+            "representative_z_path": str(rep_z_path),
+            "sampled_volumes_dir": sampled_volumes_dir,
+            "argv": argv,
+        }
+
+    if not weights_pkl.is_file():
+        return {
+            "status": "skipped",
+            "reason": f"weights.pkl not found at {weights_pkl}",
+            "representative_z_path": str(rep_z_path),
+            "sampled_volumes_dir": sampled_volumes_dir,
+        }
+
+    stdout_log = run_dir / "eval_vol_stdout.log"
+    stderr_log = run_dir / "eval_vol_stderr.log"
+    # TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1 suppresses PyTorch 2.6+ weights_only
+    # error for trusted local cryoDRGN checkpoint files only (subprocess scope).
+    env = {**os.environ, "TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD": "1"}
+    try:
+        proc = subprocess.run(argv, cwd=str(run_dir), capture_output=True, text=True, env=env, check=False)
+    except (FileNotFoundError, OSError) as exc:
+        return {
+            "status": "failed",
+            "reason": str(exc),
+            "representative_z_path": str(rep_z_path),
+            "sampled_volumes_dir": sampled_volumes_dir,
+            "argv": argv,
+            "return_code": 127,
+        }
+    _append(stdout_log, proc.stdout or "")
+    _append(stderr_log, proc.stderr or "")
+    return {
+        "status": "completed" if proc.returncode == 0 else "failed",
+        "representative_z_path": str(rep_z_path),
+        "sampled_volumes_dir": sampled_volumes_dir,
+        "argv": argv,
+        "return_code": proc.returncode,
+        "stdout_log": str(stdout_log),
+        "stderr_log": str(stderr_log),
+    }
+
+
 def build_command(state: Any, run_dir: str | Path) -> Dict[str, Any]:
     """Build and write the full command manifest for ``cryodrgn abinit``."""
 
@@ -309,6 +476,36 @@ def build_command(state: Any, run_dir: str | Path) -> Dict[str, Any]:
         abinit_cmd.extend(["--max-particles", str(params["max_particles"])])
 
     commands = list(prepared["preprocess_commands"]) + [abinit_cmd]
+
+    # When sample_volumes requested, include a planned eval_vol entry in the manifest
+    # so dry-run callers can see the full intended command sequence.  In real mode
+    # eval_vol is invoked separately via run_eval_vol() after abinit completes and
+    # z.pkl exists, because the representative latent file is built at that point.
+    eval_vol_planned: Optional[List[str]] = None
+    if params.get("sample_volumes"):
+        sampled_volumes_dir = str(params.get("sampled_volumes_dir") or (run_path / "sampled_volumes"))
+        eval_vol_planned = build_eval_vol_command(
+            prepared["executable"],
+            str(abinit_dir / "weights.pkl"),
+            str(abinit_dir / "config.pkl"),
+            str(run_path / "representative_z.txt"),
+            sampled_volumes_dir,
+            apix=float(params["eval_vol_apix"]) if params.get("eval_vol_apix") is not None else None,
+            box_size=int(params["eval_vol_box_size"]) if params.get("eval_vol_box_size") is not None else None,
+            device=str(params["eval_vol_device"]) if params.get("eval_vol_device") is not None else None,
+        )
+
+    def _cmd_name(cmd: List[str]) -> str:
+        if len(cmd) > 1 and cmd[1] in {"abinit", "abinit_het", "abinit_homo"}:
+            return "abinit"
+        if len(cmd) > 1 and cmd[1] == "eval_vol":
+            return "eval_vol"
+        return cmd[1] if len(cmd) > 1 else "command"
+
+    manifest_commands = [{"name": _cmd_name(cmd), "argv": cmd} for cmd in commands]
+    if eval_vol_planned is not None:
+        manifest_commands.append({"name": "eval_vol", "argv": eval_vol_planned})
+
     manifest = {
         "backend_name": BACKEND_NAME,
         "metadata": get_metadata(),
@@ -317,17 +514,7 @@ def build_command(state: Any, run_dir: str | Path) -> Dict[str, Any]:
         "resolved_abinit_command": abinit_command,
         "input_mode": prepared["input_mode"],
         "preprocess_manifest": prepared.get("preprocess_manifest"),
-        "commands": [
-            {
-                "name": (
-                    "abinit"
-                    if len(cmd) > 1 and cmd[1] in {"abinit", "abinit_het", "abinit_homo"}
-                    else (cmd[1] if len(cmd) > 1 else "command")
-                ),
-                "argv": cmd,
-            }
-            for cmd in commands
-        ],
+        "commands": manifest_commands,
         "stdout_log": str(run_path / "stdout.log"),
         "stderr_log": str(run_path / "stderr.log"),
     }
@@ -360,7 +547,7 @@ def _run_commands(commands: Iterable[Dict[str, Any]], cwd: Path, stdout_log: Pat
 
 
 def collect_outputs(run_dir: str | Path) -> Dict[str, Any]:
-    """Collect cryoDRGN-AI artifacts produced by abinit and analysis."""
+    """Collect cryoDRGN-AI artifacts produced by abinit and eval_vol."""
 
     run_path = Path(run_dir)
     pkl_files = sorted(str(p) for p in run_path.rglob("*.pkl") if p.is_file())
@@ -368,6 +555,10 @@ def collect_outputs(run_dir: str | Path) -> Dict[str, Any]:
     mrcs_files = sorted(str(p) for p in run_path.rglob("*.mrcs") if p.is_file())
     weights = [p for p in pkl_files if "weight" in Path(p).name.lower() or "epoch" in Path(p).name.lower()]
     latent = [p for p in pkl_files if any(token in Path(p).name.lower() for token in ("z.", "latent", "embed"))]
+    # sampled_volumes: only .mrc files produced by eval_vol in the sampled_volumes/ subdir
+    sv_dir = run_path / "sampled_volumes"
+    sampled_volumes = sorted(str(p) for p in sv_dir.glob("*.mrc") if p.is_file()) if sv_dir.is_dir() else []
+    rep_z_path = run_path / "representative_z.txt"
     return {
         "run_dir": str(run_path),
         "command_manifest": str(_command_manifest_path(run_path)),
@@ -375,10 +566,11 @@ def collect_outputs(run_dir: str | Path) -> Dict[str, Any]:
         "stderr_log": str(run_path / "stderr.log"),
         "latent_embeddings": latent,
         "model_weights": weights,
-        "sampled_volumes": mrc_files,
-        "pkl_files": pkl_files,
+        "sampled_volumes": sampled_volumes,
         "mrc_files": mrc_files,
+        "pkl_files": pkl_files,
         "mrcs_files": mrcs_files,
+        "representative_z_path": str(rep_z_path) if rep_z_path.is_file() else None,
     }
 
 
@@ -402,6 +594,9 @@ def run(state: Any, run_dir: str | Path) -> Dict[str, Any]:
     manifest = build_command(params, run_path)
     mode = str(params.get("execution_mode") or pf.get("requested_execution_mode") or "real")
     if mode == "dry_run":
+        ev_result: Optional[Dict[str, Any]] = None
+        if params.get("sample_volumes"):
+            ev_result = run_eval_vol(params, run_path, dry_run=True)
         return {
             "backend_name": BACKEND_NAME,
             "selected_backend": BACKEND_NAME,
@@ -411,13 +606,22 @@ def run(state: Any, run_dir: str | Path) -> Dict[str, Any]:
             "command_manifest": manifest["command_manifest"],
             "commands": manifest["commands"],
             "output_artifacts": collect_outputs(run_path),
+            "eval_vol_result": ev_result,
             "success": True,
         }
 
+    # Abinit commands only (eval_vol runs separately after z.pkl exists)
+    abinit_commands = [c for c in manifest["commands"] if c.get("name") != "eval_vol"]
     stdout_log = Path(str(manifest["stdout_log"]))
     stderr_log = Path(str(manifest["stderr_log"]))
-    exec_result = _run_commands(manifest["commands"], run_path, stdout_log, stderr_log)
+    exec_result = _run_commands(abinit_commands, run_path, stdout_log, stderr_log)
     status = str(exec_result.get("status"))
+
+    eval_vol_result: Optional[Dict[str, Any]] = None
+    if status == "completed" and params.get("sample_volumes"):
+        eval_vol_result = run_eval_vol(params, run_path, dry_run=False)
+
+    output_artifacts = collect_outputs(run_path)
     return {
         "backend_name": BACKEND_NAME,
         "selected_backend": BACKEND_NAME,
@@ -426,7 +630,8 @@ def run(state: Any, run_dir: str | Path) -> Dict[str, Any]:
         "preflight": pf,
         "command_manifest": manifest["command_manifest"],
         "commands": manifest["commands"],
-        "output_artifacts": collect_outputs(run_path),
+        "output_artifacts": output_artifacts,
+        "eval_vol_result": eval_vol_result,
         "stdout_log": str(stdout_log),
         "stderr_log": str(stderr_log),
         "return_code": exec_result.get("return_code"),
@@ -435,22 +640,48 @@ def run(state: Any, run_dir: str | Path) -> Dict[str, Any]:
     }
 
 
+def _build_candidate_maps(artifacts: Dict[str, Any], result: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Convert sampled volume paths to structured candidate_maps dicts."""
+    sampled_volumes = list(artifacts.get("sampled_volumes") or [])
+    if not sampled_volumes:
+        return []
+    run_dir = artifacts.get("run_dir", "")
+    rep_z_path = artifacts.get("representative_z_path") or ""
+    weights_paths = list(artifacts.get("model_weights") or [])
+    weights_path = weights_paths[0] if weights_paths else ""
+    return [
+        {
+            "source_backend": BACKEND_NAME,
+            "source_run_dir": run_dir,
+            "map_path": map_path,
+            "latent_source": rep_z_path,
+            "weights_path": weights_path,
+            "qc_status": "pending",
+            "recommended_next_action": "route_to_model_building",
+        }
+        for map_path in sampled_volumes
+    ]
+
+
 def update_state(state: Any, result: Dict[str, Any]) -> Any:
     """Write candidate maps and latent artifacts back to CryoAgent state."""
 
+    artifacts = result.get("output_artifacts") if isinstance(result.get("output_artifacts"), dict) else {}
+    candidate_maps = _build_candidate_maps(artifacts, result)
+    latent = list(artifacts.get("latent_embeddings") or [])
+    recommended = "route_to_model_building" if candidate_maps else None
+
     if isinstance(state, dict):
-        artifacts = result.get("output_artifacts") if isinstance(result.get("output_artifacts"), dict) else {}
         state["cryodrgn_ai"] = result
-        state["candidate_maps"] = list(artifacts.get("sampled_volumes") or [])
-        state["latent_space_artifacts"] = list(artifacts.get("latent_embeddings") or [])
+        state["candidate_maps"] = candidate_maps
+        state["latent_space_artifacts"] = latent
+        if recommended:
+            state["recommended_downstream_action"] = recommended
         return state
 
     state.last_execution = result
-    artifacts = result.get("output_artifacts") if isinstance(result.get("output_artifacts"), dict) else {}
-    maps = list(artifacts.get("sampled_volumes") or [])
-    latent = list(artifacts.get("latent_embeddings") or [])
     if hasattr(state, "notes"):
         state.notes.append(
-            f"cryodrgn_ai: status={result.get('status')} candidate_maps={len(maps)} latent_artifacts={len(latent)}"
+            f"cryodrgn_ai: status={result.get('status')} candidate_maps={len(candidate_maps)} latent_artifacts={len(latent)}"
         )
     return state

@@ -532,6 +532,18 @@ class Reporter:
                         extra[key] = str(le[key])[:1000]
                 if le.get("output_artifacts"):
                     extra["output_artifacts"] = str(le.get("output_artifacts"))[:1000]
+                arts = le.get("output_artifacts") if isinstance(le.get("output_artifacts"), dict) else {}
+                sampled_vols = list(arts.get("sampled_volumes") or [])
+                candidate_maps = list(le.get("candidate_maps") or [])
+                extra["cryodrgn_ai_sampled_volume_count"] = str(len(sampled_vols))
+                extra["cryodrgn_ai_candidate_map_count"] = str(len(candidate_maps))
+                if sampled_vols[:3]:
+                    extra["cryodrgn_ai_sampled_volume_paths"] = "|".join(sampled_vols[:3])
+                rec_ds = le.get("recommended_downstream_action") or (
+                    candidate_maps[0].get("recommended_next_action") if candidate_maps else None
+                )
+                if rec_ds:
+                    extra["cryodrgn_ai_recommended_downstream"] = str(rec_ds)
 
         picking_qc: Optional[Dict[str, Any]] = None
         if state.last_execution:

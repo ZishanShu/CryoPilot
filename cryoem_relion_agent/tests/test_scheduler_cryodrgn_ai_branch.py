@@ -98,5 +98,106 @@ class TestSchedulerCryodrgnAiBranch(unittest.TestCase):
             self.assertIn("subprocess_failed", result.get("failed_reason") or "")
 
 
+class TestSchedulerSampleVolumesParams(unittest.TestCase):
+    def test_scheduler_passes_sample_volumes_params_from_reconstruction_context(self) -> None:
+        """sample_volumes, n_sampled_volumes, eval_vol_* from reconstruction_context
+        must appear in the RUN_CRYODRGN_AI action parameters."""
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            star = root / "particles.star"
+            star.write_text("data_\n", encoding="utf-8")
+            exe = _fake_cryodrgn(root)
+            state = SampleState(
+                project_id="p",
+                project_path=str(root),
+                stage="Class2D",
+                status="running",
+                last_execution={
+                    "reconstruction_context": {
+                        "no_reliable_initial_model": True,
+                        "particles_star_or_mrcs": str(star),
+                        "ctf_metadata": "relion_star",
+                        "apix": 1.2,
+                        "box_size": 256,
+                        "downsample_box": 64,
+                        "cryodrgn_executable": str(exe),
+                        "sample_volumes": True,
+                        "n_sampled_volumes": 5,
+                        "eval_vol_apix": 1.2,
+                        "eval_vol_box_size": 256,
+                        "eval_vol_device": "cpu",
+                    }
+                },
+            )
+            qc = QCMetrics(motioncorr_completed=True, ctf_completed=True, class2d_completed=True)
+            sched = Scheduler(project_root=root)
+            action = sched._resolve_next_action(state, qc)
+            self.assertEqual(action.name, ActionName.RUN_CRYODRGN_AI)
+            p = action.parameters
+            self.assertTrue(p.get("sample_volumes"))
+            self.assertEqual(p.get("n_sampled_volumes"), 5)
+            self.assertAlmostEqual(float(p.get("eval_vol_apix")), 1.2)
+            self.assertEqual(p.get("eval_vol_box_size"), 256)
+            self.assertEqual(p.get("eval_vol_device"), "cpu")
+
+
+class TestReporterCryodrgnAiSampledMaps(unittest.TestCase):
+    def test_reporter_shows_sampled_volume_count_and_candidate_map_count(self) -> None:
+        """Reporter extra dict and markdown must show sampled volume / candidate map counts."""
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state = SampleState(
+                project_id="p",
+                project_path=str(root),
+                stage="Class3D",
+                status="running",
+                last_execution={
+                    "action_name": "run_cryodrgn_ai",
+                    "status": "completed",
+                    "output_artifacts": {
+                        "sampled_volumes": [
+                            "/run/sampled_volumes/vol_000.mrc",
+                            "/run/sampled_volumes/vol_001.mrc",
+                            "/run/sampled_volumes/vol_002.mrc",
+                        ],
+                        "model_weights": ["/run/abinit/weights.pkl"],
+                        "latent_embeddings": ["/run/abinit/z.pkl"],
+                        "mrc_files": [
+                            "/run/sampled_volumes/vol_000.mrc",
+                            "/run/sampled_volumes/vol_001.mrc",
+                            "/run/sampled_volumes/vol_002.mrc",
+                        ],
+                        "representative_z_path": "/run/representative_z.txt",
+                        "run_dir": "/run",
+                    },
+                    "candidate_maps": [
+                        {
+                            "source_backend": "cryodrgn_ai",
+                            "map_path": f"/run/sampled_volumes/vol_00{i}.mrc",
+                            "qc_status": "pending",
+                            "recommended_next_action": "route_to_model_building",
+                        }
+                        for i in range(3)
+                    ],
+                    "recommended_downstream_action": "route_to_model_building",
+                },
+            )
+            qc = QCMetrics(motioncorr_completed=True, ctf_completed=True, class2d_completed=True, init3d_completed=True)
+            sched = Scheduler(project_root=root)
+            with patch.object(Scheduler, "scan_project", return_value=(state, qc)):
+                report = sched.generate_report(refresh_state=False)
+
+            # Extra dict must have counts
+            self.assertEqual(report.extra.get("cryodrgn_ai_sampled_volume_count"), "3")
+            self.assertEqual(report.extra.get("cryodrgn_ai_candidate_map_count"), "3")
+
+            # Markdown must include the sampled maps section
+            md = report.to_markdown()
+            self.assertIn("cryodrgn_ai Sampled Maps", md)
+            self.assertIn("Sampled volumes: 3", md)
+            self.assertIn("Candidate maps: 3", md)
+            self.assertIn("route_to_model_building", md)
+
+
 if __name__ == "__main__":
     unittest.main()
