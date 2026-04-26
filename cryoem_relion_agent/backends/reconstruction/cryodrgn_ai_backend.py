@@ -336,18 +336,32 @@ def build_eval_vol_command(
     apix: Optional[float] = None,
     box_size: Optional[int] = None,
     device: Optional[str] = None,
+    prefix: str = "vol_",
 ) -> List[str]:
-    """Return the argv list for ``cryodrgn eval_vol`` using ``--zfile`` (not ``--z``)."""
+    """Return the argv list for cryoDRGN 3.4 ``cryodrgn eval_vol``.
+
+    Canonical form:
+        cryodrgn eval_vol <weights.pkl> -c <config.yaml> -o <out_dir> \\
+            --prefix vol_ --zfile <representative_z.txt> --Apix <apix> -D <box>
+
+    Notes:
+    - Uses ``-c`` (short for ``--config``); ``config_path`` must point to a YAML
+      file (e.g. ``abinit/config.yaml``), never a ``.pkl``.
+    - Uses ``-D`` for the box size; cryoDRGN 3.4 does not accept ``--box``.
+    - Always uses ``--zfile`` (not the ambiguous ``--z``) to read multiple
+      latent rows from a text file.
+    """
     argv: List[str] = [
         executable, "eval_vol", weights_path,
-        "--config", config_path,
-        "--zfile", zfile_path,
+        "-c", config_path,
         "-o", out_dir,
+        "--prefix", prefix,
+        "--zfile", zfile_path,
     ]
     if apix is not None:
         argv.extend(["--Apix", str(apix)])
     if box_size is not None:
-        argv.extend(["--box", str(box_size)])
+        argv.extend(["-D", str(box_size)])
     if device is not None:
         argv.extend(["--device", str(device)])
     return argv
@@ -383,7 +397,8 @@ def run_eval_vol(
         rep_z_path = sample_representative_latents(run_dir, z_pkl, n_volumes=n_volumes)
 
     weights_pkl = abinit_path / "weights.pkl"
-    config_pkl = abinit_path / "config.pkl"
+    # cryoDRGN 3.4 abinit_het writes ``config.yaml`` (not ``config.pkl``).
+    config_yaml = abinit_path / "config.yaml"
     sampled_volumes_dir = str(params.get("sampled_volumes_dir") or (run_dir / "sampled_volumes"))
     Path(sampled_volumes_dir).mkdir(parents=True, exist_ok=True)
 
@@ -393,7 +408,7 @@ def run_eval_vol(
     argv = build_eval_vol_command(
         executable,
         str(weights_pkl),
-        str(config_pkl),
+        str(config_yaml),
         str(rep_z_path),
         sampled_volumes_dir,
         apix=float(apix) if apix is not None else None,
@@ -487,7 +502,7 @@ def build_command(state: Any, run_dir: str | Path) -> Dict[str, Any]:
         eval_vol_planned = build_eval_vol_command(
             prepared["executable"],
             str(abinit_dir / "weights.pkl"),
-            str(abinit_dir / "config.pkl"),
+            str(abinit_dir / "config.yaml"),
             str(run_path / "representative_z.txt"),
             sampled_volumes_dir,
             apix=float(params["eval_vol_apix"]) if params.get("eval_vol_apix") is not None else None,
@@ -597,6 +612,8 @@ def run(state: Any, run_dir: str | Path) -> Dict[str, Any]:
         ev_result: Optional[Dict[str, Any]] = None
         if params.get("sample_volumes"):
             ev_result = run_eval_vol(params, run_path, dry_run=True)
+        artifacts = collect_outputs(run_path)
+        candidate_maps = _build_candidate_maps(artifacts, {})
         return {
             "backend_name": BACKEND_NAME,
             "selected_backend": BACKEND_NAME,
@@ -605,7 +622,9 @@ def run(state: Any, run_dir: str | Path) -> Dict[str, Any]:
             "preflight": pf,
             "command_manifest": manifest["command_manifest"],
             "commands": manifest["commands"],
-            "output_artifacts": collect_outputs(run_path),
+            "output_artifacts": artifacts,
+            "sampled_volumes": list(artifacts.get("sampled_volumes") or []),
+            "candidate_maps": candidate_maps,
             "eval_vol_result": ev_result,
             "success": True,
         }
@@ -621,7 +640,10 @@ def run(state: Any, run_dir: str | Path) -> Dict[str, Any]:
     if status == "completed" and params.get("sample_volumes"):
         eval_vol_result = run_eval_vol(params, run_path, dry_run=False)
 
+    # Refresh artifacts AFTER eval_vol so sampled_volumes/*.mrc and
+    # representative_z.txt land in the returned result.
     output_artifacts = collect_outputs(run_path)
+    candidate_maps = _build_candidate_maps(output_artifacts, {})
     return {
         "backend_name": BACKEND_NAME,
         "selected_backend": BACKEND_NAME,
@@ -631,6 +653,8 @@ def run(state: Any, run_dir: str | Path) -> Dict[str, Any]:
         "command_manifest": manifest["command_manifest"],
         "commands": manifest["commands"],
         "output_artifacts": output_artifacts,
+        "sampled_volumes": list(output_artifacts.get("sampled_volumes") or []),
+        "candidate_maps": candidate_maps,
         "eval_vol_result": eval_vol_result,
         "stdout_log": str(stdout_log),
         "stderr_log": str(stderr_log),
@@ -664,15 +688,34 @@ def _build_candidate_maps(artifacts: Dict[str, Any], result: Dict[str, Any]) -> 
 
 
 def update_state(state: Any, result: Dict[str, Any]) -> Any:
-    """Write candidate maps and latent artifacts back to CryoAgent state."""
+    """Write candidate maps and latent artifacts back to CryoAgent state.
+
+    For dict state (used by the closed-loop tests and HTTP layer), this writes
+    both top-level convenience keys and a structured ``last_execution`` dict so
+    consumers can reach ``state["last_execution"]["sampled_volumes"]`` and
+    ``state["last_execution"]["output_artifacts"]["sampled_volumes"]``.
+    """
 
     artifacts = result.get("output_artifacts") if isinstance(result.get("output_artifacts"), dict) else {}
-    candidate_maps = _build_candidate_maps(artifacts, result)
+    sampled_volumes = list(artifacts.get("sampled_volumes") or result.get("sampled_volumes") or [])
+    candidate_maps = list(result.get("candidate_maps") or _build_candidate_maps(artifacts, result))
     latent = list(artifacts.get("latent_embeddings") or [])
     recommended = "route_to_model_building" if candidate_maps else None
 
+    # Idempotently enrich result so ``state["last_execution"]`` exposes the
+    # closed-loop fields regardless of whether run() already populated them.
+    result["candidate_maps"] = candidate_maps
+    result["sampled_volumes"] = sampled_volumes
+    if recommended:
+        result.setdefault("recommended_downstream_action", recommended)
+    if isinstance(artifacts, dict):
+        artifacts.setdefault("sampled_volumes", sampled_volumes)
+        artifacts.setdefault("mrc_files", list(artifacts.get("mrc_files") or sampled_volumes))
+        result["output_artifacts"] = artifacts
+
     if isinstance(state, dict):
         state["cryodrgn_ai"] = result
+        state["last_execution"] = result
         state["candidate_maps"] = candidate_maps
         state["latent_space_artifacts"] = latent
         if recommended:
