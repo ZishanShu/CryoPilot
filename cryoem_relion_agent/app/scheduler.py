@@ -9,6 +9,11 @@ from uuid import uuid4
 
 from agent.backend_registry import get_backend_capability_matrix
 from agent.backend_registry import model_action_to_backend, model_building_backend_to_action_name
+from agent.candidate_map_router import (
+    action_parameters_from_record,
+    create_candidate_map_routing_records,
+    read_candidate_maps,
+)
 from agent.model_building_preflight import preflight_model_building
 from agent.heterogeneity_preflight import enrich_and_preflight_cryodrgn_params
 from agent.picking_preflight import enrich_and_preflight_topaz_params
@@ -147,6 +152,8 @@ class Scheduler:
         execution_mode = str(action.parameters.get("execution_mode", "")).strip()
         if action.name == ActionName.RUN_CRYODRGN_AI and execution_mode:
             tags.append(f"execution_mode={execution_mode}")
+        if action.parameters.get("candidate_index") is not None:
+            tags.append(f"candidate_index={action.parameters.get('candidate_index')}")
         model_building_backend = str(action.parameters.get("model_building_backend", "")).strip()
         if model_building_backend:
             tags.append(f"model_building_backend={model_building_backend}")
@@ -464,6 +471,82 @@ class Scheduler:
             priority=int(self.policy_engine.rules.get("priorities", {}).get("run_cryodrgn_ai", 67)),
         )
 
+    def _candidate_map_context(self, state, modeling_context: Optional[ModelingContext]) -> Dict[str, Any]:
+        ctx: Dict[str, Any] = {}
+        last = state.last_execution if isinstance(getattr(state, "last_execution", None), dict) else {}
+        if isinstance(last, dict):
+            raw = last.get("candidate_map_routing_context")
+            if isinstance(raw, dict):
+                ctx.update(raw)
+            if last.get("af3_dir") and "af3_dir" not in ctx:
+                ctx["af3_dir"] = last.get("af3_dir")
+            if last.get("allow_seq_free") is not None and "allow_seq_free" not in ctx:
+                ctx["allow_seq_free"] = last.get("allow_seq_free")
+        if modeling_context is not None:
+            if getattr(modeling_context, "af3_dir", None):
+                ctx["af3_dir"] = str(modeling_context.af3_dir)
+            if getattr(modeling_context, "chain_count", None):
+                ctx["chain_count"] = modeling_context.chain_count
+            if not getattr(modeling_context, "known_sequence", False) and not getattr(state, "sequence_path", None):
+                ctx.setdefault("allow_seq_free", True)
+            raw = getattr(modeling_context, "candidate_map_routing_context", None)
+            if isinstance(raw, dict):
+                ctx.update(raw)
+        return ctx
+
+    def _maybe_candidate_map_model_building_action(
+        self,
+        state,
+        qc,
+        modeling_context: Optional[ModelingContext] = None,
+        *,
+        preferred_picking_backend: Optional[str] = None,
+    ) -> Optional[Action]:
+        """Route candidate maps only when the normal scheduler is at model-building time."""
+
+        candidates = read_candidate_maps(state)
+        if not candidates:
+            return None
+        probe = self.policy_engine.decide_next_action(
+            state,
+            qc,
+            log_history=False,
+            preferred_picking_backend=preferred_picking_backend,
+        )
+        if probe is not None and probe.name not in {ActionName.RUN_VALIDATION}:
+            return None
+
+        ctx = self._candidate_map_context(state, modeling_context)
+        records = create_candidate_map_routing_records(
+            state,
+            max_candidates=int(ctx.get("max_candidates") or 5),
+            allow_seq_free=bool(ctx.get("allow_seq_free") or ctx.get("seq_free_allowed")),
+            af3_dir=ctx.get("af3_dir"),
+            output_root=ctx.get("output_root"),
+            emodelx_config_path=self.config_dir / "emodelx.yaml",
+            mica_config_path=self.config_dir / "mica.yaml",
+        )
+        if not records:
+            return None
+        selected = next((r for r in records if r.get("downstream_action")), records[0])
+        action_name = selected.get("downstream_action") or "run_validation"
+        try:
+            name = ActionName(str(action_name))
+        except ValueError:
+            name = ActionName.RUN_VALIDATION
+        params = action_parameters_from_record(selected)
+        params["candidate_map_routing_records"] = records
+        params["candidate_map_count"] = len(candidates)
+        params["candidate_map_selected_count"] = len(records)
+        params.setdefault("routing_reason", selected.get("routing_reason"))
+        priority = self.structure_router.rules.get("priorities", {}).get(str(action_name), 58)
+        return Action(
+            name=name,
+            reason=f"Route candidate map {selected.get('candidate_index')} to model building.",
+            parameters=params,
+            priority=int(priority),
+        )
+
 
     def _resolve_next_action(
         self,
@@ -475,6 +558,15 @@ class Scheduler:
         picking_overrides: Optional[Dict[str, Any]] = None,
     ) -> Action:
         """Apply policy; if it delegates structure routing, call ``StructureRouter``."""
+        candidate_action = self._maybe_candidate_map_model_building_action(
+            state,
+            qc,
+            modeling_context=modeling_context,
+            preferred_picking_backend=preferred_picking_backend,
+        )
+        if candidate_action is not None:
+            return candidate_action
+
         reconstruction_action = self._maybe_reconstruction_action(state, qc, modeling_context=modeling_context)
         if reconstruction_action is not None:
             return reconstruction_action
