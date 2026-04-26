@@ -59,7 +59,10 @@ class TestCandidateMapBatchModelBuilding(unittest.TestCase):
                 "execution_mode": "dry_run",
                 "command": "model_angelo build -v /tmp/proj/sampled_volumes/vol_002.mrc -pf /tmp/proj/seq.fasta -o /tmp/proj/CandidateMapModelBuilding/candidate_002",
             },
-            "action_parameters": {"output_dir": "/tmp/proj/CandidateMapModelBuilding/candidate_002"},
+            "action_parameters": {
+                "output_dir": "/tmp/proj/CandidateMapModelBuilding/candidate_002",
+                "sequence_path": "/tmp/proj/seq.fasta",
+            },
         }
         plans = build_candidate_model_building_plan([record], top_k=5, dry_run=True)
         self.assertEqual(len(plans), 1)
@@ -73,6 +76,17 @@ class TestCandidateMapBatchModelBuilding(unittest.TestCase):
         self.assertEqual(plan["selected_action"], "run_modelangelo")
         self.assertIn("model_angelo build", plan["command"] or "")
         self.assertIsInstance(plan["model_building_preflight"], dict)
+        self.assertIsInstance(plan["command_argv"], list)
+        self.assertIn("model_angelo", plan["command_argv"])
+        self.assertIn("build", plan["command_argv"])
+        self.assertIn("-v", plan["command_argv"])
+        self.assertIn("-pf", plan["command_argv"])
+        self.assertIn("-o", plan["command_argv"])
+        self.assertIn("/tmp/proj/sampled_volumes/vol_002.mrc", plan["command_argv"])
+        self.assertIn("/tmp/proj/CandidateMapModelBuilding/candidate_002", plan["command_argv"])
+        self.assertIn("/tmp/proj/seq.fasta", plan["command_argv"])
+        self.assertIsInstance(plan["command"], str)
+        self.assertIn("model_angelo build", plan["command"])
 
     def test_batch_plan_output_dir_is_deterministic_per_candidate(self) -> None:
         records = [
