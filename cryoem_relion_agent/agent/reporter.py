@@ -11,6 +11,8 @@ from agent.candidate_map_router import create_candidate_map_routing_records, rea
 from schemas.action import Action
 from schemas.action_history import ActionHistoryEntry
 from schemas.qc_metrics import QCMetrics
+from agent.candidate_map_router import create_candidate_map_routing_records, read_candidate_maps
+from agent.candidate_map_router import create_candidate_map_routing_records, read_candidate_maps
 from schemas.report import ExecutionSummary, PipelineReport, RoutingDecision
 from schemas.sample_state import SampleState
 
@@ -208,9 +210,64 @@ class Reporter:
         return None
 
     @staticmethod
-    def _extract_picking_backend(next_action: Optional[Action], history: Sequence[ActionHistoryEntry]) -> Optional[str]:
+    def _picking_backend_from_last_execution(state: SampleState) -> Optional[str]:
+        """Extract picking_backend from state.last_execution (and metadata)."""
+        le = getattr(state, "last_execution", None)
+        if not isinstance(le, dict) or not le:
+            return None
+        v = le.get("picking_backend")
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+        md = le.get("metadata")
+        if isinstance(md, dict):
+            v = md.get("picking_backend")
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+        # Inferred-Topaz: if picking_qc is present and a topaz_output_path exists,
+        # the run that produced QC was a Topaz run.
+        qc = le.get("picking_qc") if isinstance(le, dict) else None
+        if not isinstance(qc, dict) and isinstance(md, dict):
+            qc = md.get("picking_qc")
+        topaz_path = None
+        if isinstance(le, dict):
+            topaz_path = le.get("topaz_output_path")
+        if topaz_path is None and isinstance(md, dict):
+            topaz_path = md.get("topaz_output_path")
+        if isinstance(qc, dict) and topaz_path:
+            return "topaz"
+        return None
+
+    @staticmethod
+    def _extract_picking_backend(
+        next_action: Optional[Action],
+        history: Sequence[ActionHistoryEntry],
+        state: Optional[SampleState] = None,
+    ) -> Optional[str]:
+        # Picking QC gate: when next_action is the gate, the backend that produced
+        # the failed QC is what the report must surface — never an unrelated later
+        # run logged in action_history.
+        if (
+            next_action
+            and next_action.name.value == "request_human_review"
+            and isinstance(next_action.parameters, dict)
+            and next_action.parameters.get("branch_name") == "picking_qc"
+        ):
+            v = str(next_action.parameters.get("picking_backend", "")).strip()
+            if v:
+                return v
+            if state is not None:
+                v2 = Reporter._picking_backend_from_last_execution(state)
+                if v2:
+                    return v2
+            return "topaz"
         if next_action and next_action.name.value == "run_autopick":
             v = str(next_action.parameters.get("picking_backend", "")).strip()
+            if v:
+                return v
+        # If last_execution (and metadata) carry a picking_backend with picking_qc,
+        # prefer it over later unrelated history entries.
+        if state is not None:
+            v = Reporter._picking_backend_from_last_execution(state)
             if v:
                 return v
         for item in reversed(list(history)):
@@ -388,7 +445,9 @@ class Reporter:
         selected_run_id = current_run_id or (report_history[-1].run_id if report_history else None)
         stage_transition_summary = self._summarize_stage_transitions(report_history)
         branch_summaries = self._summarize_branches(report_history)
-        picking_backend = self._extract_picking_backend(next_action=next_action, history=report_history)
+        picking_backend = self._extract_picking_backend(
+            next_action=next_action, history=report_history, state=state
+        )
         heterogeneity_backend = self._extract_heterogeneity_backend(next_action=next_action, history=report_history)
         model_building_backend = self._extract_model_building_backend(next_action=next_action, history=report_history)
         reconstruction_backend = self._extract_reconstruction_backend(next_action=next_action, history=report_history)
@@ -396,7 +455,7 @@ class Reporter:
         pk_preflight = self._extract_picking_preflight(next_action=next_action, history=report_history)
         het_preflight = self._extract_heterogeneity_preflight(next_action=next_action, history=report_history)
         cryodrgn_ai_preflight = self._extract_cryodrgn_ai_preflight(next_action=next_action, history=report_history)
-        candidate_map_routing = []
+        candidate_map_routing: List[Dict[str, Any]] = []
         if next_action and isinstance(next_action.parameters, dict):
             raw_records = next_action.parameters.get("candidate_map_routing_records")
             if isinstance(raw_records, list):
@@ -412,7 +471,6 @@ class Reporter:
             extra["model_building_backend"] = model_building_backend
         if reconstruction_backend:
             extra["reconstruction_backend"] = reconstruction_backend
-        extra["candidate_map_count"] = str(len(read_candidate_maps(state)))
         if mb_preflight:
             extra["model_building_availability"] = "available" if mb_preflight.get("available") else "unavailable"
             if mb_preflight.get("execution_mode"):
@@ -484,6 +542,32 @@ class Reporter:
                         extra[key] = str(le[key])[:1000]
                 if le.get("output_artifacts"):
                     extra["output_artifacts"] = str(le.get("output_artifacts"))[:1000]
+                arts = le.get("output_artifacts") if isinstance(le.get("output_artifacts"), dict) else {}
+                sampled_vols = list(arts.get("sampled_volumes") or [])
+                candidate_maps = list(le.get("candidate_maps") or [])
+                extra["cryodrgn_ai_sampled_volume_count"] = str(len(sampled_vols))
+                extra["cryodrgn_ai_candidate_map_count"] = str(len(candidate_maps))
+                if sampled_vols[:3]:
+                    extra["cryodrgn_ai_sampled_volume_paths"] = "|".join(sampled_vols[:3])
+                rec_ds = le.get("recommended_downstream_action") or (
+                    candidate_maps[0].get("recommended_next_action") if candidate_maps else None
+                )
+                if rec_ds:
+                    extra["cryodrgn_ai_recommended_downstream"] = str(rec_ds)
+        if candidate_map_routing:
+            extra["candidate_map_count"] = str(len(read_candidate_maps(state)))
+            extra["candidate_map_routing_count"] = str(len(candidate_map_routing))
+
+        picking_qc: Optional[Dict[str, Any]] = None
+        if state.last_execution:
+            le = state.last_execution
+            qc_payload = le.get("picking_qc") if isinstance(le, dict) else None
+            if not isinstance(qc_payload, dict):
+                md_payload = le.get("metadata") if isinstance(le, dict) else None
+                if isinstance(md_payload, dict):
+                    qc_payload = md_payload.get("picking_qc")
+            if isinstance(qc_payload, dict):
+                picking_qc = qc_payload
 
         return PipelineReport(
             state=state,
@@ -501,6 +585,7 @@ class Reporter:
             extra=extra,
             model_building_preflight=mb_preflight,
             picking_preflight=pk_preflight,
+            picking_qc=picking_qc,
             heterogeneity_preflight=het_preflight,
             cryodrgn_ai_preflight=cryodrgn_ai_preflight,
             reconstruction_preflight=cryodrgn_ai_preflight,

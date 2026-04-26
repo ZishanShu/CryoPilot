@@ -131,7 +131,11 @@ class TestCryodrgnSchedulerEnrich(unittest.TestCase):
             action = Action(
                 name=ActionName.RUN_CRYODRGN,
                 reason="r",
-                parameters={"heterogeneity_backend": "cryodrgn", "branch_name": "heterogeneity"},
+                parameters={
+                    "heterogeneity_backend": "cryodrgn",
+                    "branch_name": "heterogeneity",
+                    "cryodrgn_executable": "/nonexistent/cryodrgn",
+                },
                 priority=94,
             )
             enriched = sched._enrich_cryodrgn_action(state, action)

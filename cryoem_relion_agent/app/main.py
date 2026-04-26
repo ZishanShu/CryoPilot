@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import typer
 
@@ -87,13 +87,82 @@ def run_next(
         "--sequence",
         help="Path to FASTA/sequence file for this run.",
     ),
+    picking_backend: Optional[str] = typer.Option(
+        None,
+        "--picking-backend",
+        help="Picking backend override: relion_log | topaz | cryolo.",
+    ),
+    micrographs_star: Optional[Path] = typer.Option(
+        None,
+        "--micrographs-star",
+        help="Explicit micrographs.star input for picking (Topaz etc.).",
+    ),
+    particle_diameter_angstrom: Optional[float] = typer.Option(
+        None,
+        "--particle-diameter-angstrom",
+        help="Expected particle diameter in angstroms.",
+    ),
+    topaz_threshold: Optional[float] = typer.Option(
+        None,
+        "--topaz-threshold",
+        help="Topaz picking score threshold (e.g. -6).",
+    ),
+    topaz_device: Optional[str] = typer.Option(
+        None,
+        "--topaz-device",
+        help='Topaz device spec (e.g. "cpu", "0", "1").',
+    ),
+    topaz_output_dir: Optional[Path] = typer.Option(
+        None,
+        "--topaz-output-dir",
+        help="Override output directory for the Topaz run.",
+    ),
+    gt_coords_dir: Optional[Path] = typer.Option(
+        None,
+        "--gt-coords-dir",
+        help="Directory of CryoPPP-style ground-truth coordinate CSVs (one per micrograph). Enables GT evaluation in picking QC.",
+    ),
+    coordinate_scale: Optional[float] = typer.Option(
+        None,
+        "--coordinate-scale",
+        help="Scale predicted picks to GT coordinate space (e.g. 4.0 for ds4 Topaz). Default 1.0.",
+    ),
+    matching_tolerance_px: Optional[float] = typer.Option(
+        None,
+        "--matching-tolerance-px",
+        help="Tolerance for greedy GT matching, in pixels. Default 80.0.",
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Decide and run next action."""
     setup_logging(verbose)
     validate_sequence_path(sequence)
+    picking_overrides: Dict[str, Any] = {}
+    if micrographs_star is not None:
+        picking_overrides["micrographs_star_path"] = str(micrographs_star)
+    if particle_diameter_angstrom is not None:
+        picking_overrides["particle_diameter_angstrom"] = float(particle_diameter_angstrom)
+    if topaz_threshold is not None:
+        picking_overrides["topaz_threshold"] = float(topaz_threshold)
+    if topaz_device is not None:
+        picking_overrides["topaz_device"] = str(topaz_device)
+    if topaz_output_dir is not None:
+        picking_overrides["output_dir"] = str(topaz_output_dir)
+    picking_qc_params: Dict[str, Any] = {}
+    if gt_coords_dir is not None:
+        picking_qc_params["gt_coords_dir"] = str(gt_coords_dir)
+    if coordinate_scale is not None:
+        picking_qc_params["coordinate_scale"] = float(coordinate_scale)
+    if matching_tolerance_px is not None:
+        picking_qc_params["matching_tolerance_px"] = float(matching_tolerance_px)
     scheduler = Scheduler(project_root=project)
-    action, result = scheduler.run_next(dry_run=dry_run, sequence_override=sequence)
+    action, result = scheduler.run_next(
+        dry_run=dry_run,
+        sequence_override=sequence,
+        preferred_picking_backend=(str(picking_backend).strip() if picking_backend else None),
+        picking_overrides=picking_overrides or None,
+        picking_qc_params=picking_qc_params or None,
+    )
     typer.echo(json.dumps({"action": action.model_dump(mode="json"), "execution": result}, indent=2))
 
 
@@ -147,6 +216,56 @@ def generate_report(
         refresh_state=refresh_state,
     )
     typer.echo(f"Report generated. stage={report.state.stage}, next_action={report.next_action.name.value if report.next_action else 'N/A'}")
+
+
+@app.command("run-picking-benchmark")
+def run_picking_benchmark(
+    cases_json: Path = typer.Option(
+        ...,
+        "--cases-json",
+        help="Path to benchmark cases JSON (list or {\"cases\": [...]}).",
+    ),
+    out_dir: Path = typer.Option(..., "--out-dir", help="Output directory for benchmark results."),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Dry-run each case without executing subprocesses.",
+    ),
+    threshold_sweep: bool = typer.Option(
+        False,
+        "--threshold-sweep/--no-threshold-sweep",
+        help="Expand cases by topaz_thresholds.",
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Run picking benchmark suite from a cases JSON file."""
+    setup_logging(verbose)
+    from agent.picking_benchmark import (
+        PickingBenchmarkRunner,
+        expand_threshold_sweep,
+        load_cases_from_json,
+        write_outputs,
+    )
+
+    cases = load_cases_from_json(cases_json)
+    if threshold_sweep:
+        cases = [expanded for case in cases for expanded in expand_threshold_sweep(case)]
+
+    runner = PickingBenchmarkRunner()
+    summary = runner.run_cases(cases, dry_run=dry_run)
+    paths = write_outputs(summary, out_dir)
+    typer.echo(
+        json.dumps(
+            {
+                "case_count": summary["case_count"],
+                "qc_passed": summary["qc_passed"],
+                "qc_failed": summary["qc_failed"],
+                "errors": summary["errors"],
+                "outputs": {k: str(v) for k, v in paths.items()},
+            },
+            indent=2,
+        )
+    )
 
 
 @app.command("init-db")

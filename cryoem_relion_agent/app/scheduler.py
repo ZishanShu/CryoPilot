@@ -10,7 +10,6 @@ from uuid import uuid4
 from agent.backend_registry import get_backend_capability_matrix
 from agent.backend_registry import model_action_to_backend, model_building_backend_to_action_name
 from agent.candidate_map_router import (
-    BRANCH_NAME as CANDIDATE_MAP_BRANCH,
     action_parameters_from_record,
     create_candidate_map_routing_records,
     read_candidate_maps,
@@ -153,6 +152,8 @@ class Scheduler:
         execution_mode = str(action.parameters.get("execution_mode", "")).strip()
         if action.name == ActionName.RUN_CRYODRGN_AI and execution_mode:
             tags.append(f"execution_mode={execution_mode}")
+        if action.parameters.get("candidate_index") is not None:
+            tags.append(f"candidate_index={action.parameters.get('candidate_index')}")
         model_building_backend = str(action.parameters.get("model_building_backend", "")).strip()
         if model_building_backend:
             tags.append(f"model_building_backend={model_building_backend}")
@@ -226,6 +227,16 @@ class Scheduler:
             state.sequence_path = str(sequence_override.resolve())
         elif persisted is not None and persisted.sequence_path:
             state.sequence_path = persisted.sequence_path
+
+        # Filesystem QC extraction never produces ``last_execution``; preserve it
+        # from the persisted state so policy gates that depend on prior execution
+        # results (e.g. picking_qc) survive across run-next/generate-report calls.
+        if (
+            persisted is not None
+            and getattr(persisted, "last_execution", None)
+            and not getattr(state, "last_execution", None)
+        ):
+            state.last_execution = persisted.last_execution
 
         if persist_state:
             self.state_manager.save_state(state)
@@ -332,6 +343,68 @@ class Scheduler:
                 merged.setdefault("af3_dir", pf.get("af3_dir"))
         return action.model_copy(update={"parameters": merged})
 
+    @staticmethod
+    def _attach_picking_qc(
+        result: Dict[str, Any],
+        action: Action,
+        qc_params: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Run picking QC gate over Topaz output and merge it into ``result``.
+
+        ``qc_params`` (from the CLI) overrides the matching keys carried on
+        ``action.parameters``.  Never raises: any QC error is recorded under
+        ``picking_qc_error``.
+        """
+        params = action.parameters if isinstance(action.parameters, dict) else {}
+        md = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
+        picks_path = (
+            result.get("topaz_output_path")
+            or md.get("topaz_output_path")
+            or params.get("picked_particles_star")
+            or params.get("topaz_output_path")
+        )
+        if not picks_path or not Path(str(picks_path)).is_file():
+            return
+        overrides = qc_params or {}
+        gt_dir = (
+            overrides.get("gt_coords_dir")
+            or params.get("gt_coords_dir")
+            or params.get("picking_gt_coords_dir")
+        )
+        coord_scale = (
+            overrides.get("coordinate_scale")
+            if overrides.get("coordinate_scale") is not None
+            else params.get("picking_coordinate_scale")
+        )
+        tol_px = (
+            overrides.get("matching_tolerance_px")
+            if overrides.get("matching_tolerance_px") is not None
+            else params.get("picking_matching_tolerance_px")
+        )
+        try:
+            from agent.picking_qc import evaluate_picking_output
+            mics = params.get("micrographs_star_path")
+            qc_dict = evaluate_picking_output(
+                picks_path=Path(str(picks_path)),
+                micrographs_star_path=Path(str(mics)) if mics else None,
+                gt_coords_dir=Path(str(gt_dir)) if gt_dir else None,
+                coordinate_scale=float(coord_scale) if coord_scale is not None else 1.0,
+                matching_tolerance_px=(
+                    float(tol_px) if tol_px is not None else 80.0
+                ),
+                thresholds=(
+                    params.get("picking_qc_thresholds")
+                    if isinstance(params.get("picking_qc_thresholds"), dict)
+                    else None
+                ),
+            )
+            md["picking_qc"] = qc_dict
+            result["picking_qc"] = qc_dict
+        except Exception as exc:  # pragma: no cover - defensive: never block run-next
+            md["picking_qc_error"] = str(exc)
+            result["picking_qc_error"] = str(exc)
+        result["metadata"] = md
+
     def _maybe_reconstruction_action(self, state, qc, modeling_context: Optional[ModelingContext] = None) -> Optional[Action]:
         """Optionally route reconstruction to cryodrgn_ai; RELION remains default."""
 
@@ -382,6 +455,12 @@ class Scheduler:
             "require_gpu",
             "output_dir",
             "run_dir",
+            # sampled-volume generation
+            "sample_volumes",
+            "n_sampled_volumes",
+            "eval_vol_apix",
+            "eval_vol_box_size",
+            "eval_vol_device",
         ):
             if key in ctx and ctx[key] not in (None, ""):
                 params[key] = ctx[key]
@@ -420,13 +499,20 @@ class Scheduler:
         state,
         qc,
         modeling_context: Optional[ModelingContext] = None,
+        *,
+        preferred_picking_backend: Optional[str] = None,
     ) -> Optional[Action]:
         """Route candidate maps only when the normal scheduler is at model-building time."""
 
         candidates = read_candidate_maps(state)
         if not candidates:
             return None
-        probe = self.policy_engine.decide_next_action(state, qc, log_history=False)
+        probe = self.policy_engine.decide_next_action(
+            state,
+            qc,
+            log_history=False,
+            preferred_picking_backend=preferred_picking_backend,
+        )
         if probe is not None and probe.name not in {ActionName.RUN_VALIDATION}:
             return None
 
@@ -450,7 +536,7 @@ class Scheduler:
             name = ActionName.RUN_VALIDATION
         params = action_parameters_from_record(selected)
         params["candidate_map_routing_records"] = records
-        params["candidate_map_count"] = len(read_candidate_maps(state))
+        params["candidate_map_count"] = len(candidates)
         params["candidate_map_selected_count"] = len(records)
         params.setdefault("routing_reason", selected.get("routing_reason"))
         priority = self.structure_router.rules.get("priorities", {}).get(str(action_name), 58)
@@ -461,18 +547,22 @@ class Scheduler:
             priority=int(priority),
         )
 
+
     def _resolve_next_action(
         self,
         state,
         qc,
         modeling_context: Optional[ModelingContext] = None,
         log_history: bool = True,
+        preferred_picking_backend: Optional[str] = None,
+        picking_overrides: Optional[Dict[str, Any]] = None,
     ) -> Action:
         """Apply policy; if it delegates structure routing, call ``StructureRouter``."""
         candidate_action = self._maybe_candidate_map_model_building_action(
             state,
             qc,
             modeling_context=modeling_context,
+            preferred_picking_backend=preferred_picking_backend,
         )
         if candidate_action is not None:
             return candidate_action
@@ -481,9 +571,21 @@ class Scheduler:
         if reconstruction_action is not None:
             return reconstruction_action
 
-        action = self.policy_engine.decide_next_action(state, qc, log_history=log_history)
+        action = self.policy_engine.decide_next_action(
+            state,
+            qc,
+            log_history=log_history,
+            preferred_picking_backend=preferred_picking_backend,
+        )
+
         if action is not None:
             if action.name == ActionName.RUN_AUTOPICK:
+                if picking_overrides:
+                    merged = dict(action.parameters)
+                    for k, v in picking_overrides.items():
+                        if v is not None:
+                            merged[k] = v
+                    action = action.model_copy(update={"parameters": merged})
                 action = self._enrich_autopick_action(state, action)
             elif action.name == ActionName.RUN_CRYODRGN:
                 action = self._enrich_cryodrgn_action(state, action)
@@ -607,11 +709,19 @@ class Scheduler:
         self,
         sequence_override: Optional[Path] = None,
         modeling_context: Optional[ModelingContext] = None,
+        preferred_picking_backend: Optional[str] = None,
+        picking_overrides: Optional[Dict[str, Any]] = None,
     ) -> Action:
         """Decide next pipeline action (including structure-tool routing when applicable)."""
         self._begin_run_trace()
         state, qc = self.scan_project(sequence_override=sequence_override)
-        action = self._resolve_next_action(state, qc, modeling_context=modeling_context)
+        action = self._resolve_next_action(
+            state,
+            qc,
+            modeling_context=modeling_context,
+            preferred_picking_backend=preferred_picking_backend,
+            picking_overrides=picking_overrides,
+        )
         state.last_action = action.name.value
         self.state_manager.save_state(state)
         return action
@@ -621,11 +731,20 @@ class Scheduler:
         dry_run: bool = False,
         sequence_override: Optional[Path] = None,
         modeling_context: Optional[ModelingContext] = None,
+        preferred_picking_backend: Optional[str] = None,
+        picking_overrides: Optional[Dict[str, Any]] = None,
+        picking_qc_params: Optional[Dict[str, Any]] = None,
     ):
         """Decide and execute next action."""
         run_id = self._begin_run_trace()
         state, qc = self.scan_project(sequence_override=sequence_override)
-        action = self._resolve_next_action(state, qc, modeling_context=modeling_context)
+        action = self._resolve_next_action(
+            state,
+            qc,
+            modeling_context=modeling_context,
+            preferred_picking_backend=preferred_picking_backend,
+            picking_overrides=picking_overrides,
+        )
         decision_entry_id = self.policy_engine.get_last_decision_entry_id()
         # PolicyEngine may have already persisted the decision entry directly.
         # Keep scheduler-local chain pointer in sync so execution.previous_entry_id
@@ -672,6 +791,87 @@ class Scheduler:
             dry_run=dry_run,
             state=state,
         )
+        if isinstance(result, dict) and action.name == ActionName.RUN_AUTOPICK:
+            pk = str(action.parameters.get("picking_backend") or "").strip()
+            if pk:
+                result.setdefault("picking_backend", pk)
+                md = result.get("metadata")
+                if not isinstance(md, dict):
+                    md = {}
+                md.setdefault("picking_backend", pk)
+                result["metadata"] = md
+            if pk == "topaz":
+                self._attach_picking_qc(result, action, qc_params=picking_qc_params)
+
+        # Picking QC gate: when the gate fires (request_human_review, branch_name=picking_qc),
+        # persist the gate evidence into result/metadata so that subsequent scan_project/
+        # generate-report calls can recover the failed_qc state and keep the gate active.
+        if (
+            isinstance(result, dict)
+            and action.name == ActionName.REQUEST_HUMAN_REVIEW
+            and isinstance(action.parameters, dict)
+            and str(action.parameters.get("branch_name", "")).strip() == "picking_qc"
+        ):
+            params = action.parameters
+            result["branch_name"] = "picking_qc"
+            result["picking_backend"] = str(params.get("picking_backend") or "topaz")
+            result["picking_qc_status"] = str(params.get("picking_qc_status") or "failed_qc")
+            result["picking_qc_flags"] = list(params.get("picking_qc_flags") or [])
+            result["recommended_next_action"] = str(params.get("recommended_next_action") or "")
+            for _k in (
+                "n_picks",
+                "n_micrographs_with_picks",
+                "n_micrographs_total",
+                "zero_pick_micrograph_ratio",
+                "mean_picks_per_micrograph",
+                "median_picks_per_micrograph",
+                "matching_tolerance_px",
+                "coordinate_scale",
+                "precision",
+                "recall",
+                "f1",
+            ):
+                result[_k] = params.get(_k)
+            md = result.get("metadata")
+            if not isinstance(md, dict):
+                md = {}
+            md["branch_name"] = "picking_qc"
+            md["picking_backend"] = result["picking_backend"]
+            md["picking_qc_status"] = result["picking_qc_status"]
+            md["picking_qc_flags"] = result["picking_qc_flags"]
+            md["recommended_next_action"] = result["recommended_next_action"]
+            # Prefer the full picking_qc dict if the policy engine handed us one;
+            # otherwise reconstruct from flattened fields.
+            nested_pq = params.get("picking_qc")
+            if isinstance(nested_pq, dict) and nested_pq:
+                pq_persist = dict(nested_pq)
+            else:
+                ge: Dict[str, Any] = {}
+                for _k in ("precision", "recall", "f1", "matching_tolerance_px"):
+                    _v = params.get(_k)
+                    if _v is not None:
+                        ge[_k] = _v
+                pq_persist = {
+                    "qc_status": result["picking_qc_status"],
+                    "qc_flags": result["picking_qc_flags"],
+                    "recommended_next_action": result["recommended_next_action"],
+                    "n_picks": params.get("n_picks"),
+                    "n_micrographs_with_picks": params.get("n_micrographs_with_picks"),
+                    "n_micrographs_total": params.get("n_micrographs_total"),
+                    "zero_pick_micrograph_ratio": params.get("zero_pick_micrograph_ratio"),
+                    "mean_picks_per_micrograph": params.get("mean_picks_per_micrograph"),
+                    "median_picks_per_micrograph": params.get("median_picks_per_micrograph"),
+                    "matching_tolerance_px": params.get("matching_tolerance_px"),
+                    "coordinate_scale": params.get("coordinate_scale"),
+                }
+                if ge:
+                    pq_persist["ground_truth_evaluation"] = ge
+            md["picking_qc"] = pq_persist
+            # Mirror the nested picking_qc onto the top-level result too, so any
+            # downstream consumer that reads ``last_execution["picking_qc"]``
+            # (rather than ``metadata.picking_qc``) sees the same payload.
+            result["picking_qc"] = pq_persist
+            result["metadata"] = md
         self._record_action_history(
             ActionHistoryEntry(
                 run_id=run_id,
