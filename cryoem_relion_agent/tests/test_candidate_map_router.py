@@ -102,6 +102,9 @@ class TestCandidateMapRouter(unittest.TestCase):
             self.assertIsInstance(action.parameters.get("candidate_map_routing_records"), list)
             self.assertEqual(action.parameters.get("candidate_map_selection_reason"), "highest_qc_score")
             self.assertIn("selected_candidate_qc_score", action.parameters)
+            self.assertIsInstance(action.parameters.get("candidate_map_batch_model_building_plans"), list)
+            self.assertEqual(action.parameters.get("candidate_map_batch_count"), 1)
+            self.assertEqual(action.parameters.get("candidate_map_batch_top_k"), 5)
 
     def test_router_selects_highest_qc_score_candidate(self) -> None:
         with TemporaryDirectory() as tmp:

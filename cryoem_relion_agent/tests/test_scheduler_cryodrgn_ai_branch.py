@@ -297,6 +297,11 @@ class TestCandidateMapStatePersistence(unittest.TestCase):
             self.assertEqual(saved.last_execution.get("status"), "dry_run")
             self.assertEqual(len(saved.last_execution.get("candidate_maps") or []), 5)
             self.assertEqual(len(saved.last_execution.get("candidate_map_routing_records") or []), 5)
+            batch_plans = saved.last_execution.get("candidate_map_batch_model_building_plans")
+            if batch_plans is not None:
+                self.assertIsInstance(batch_plans, list)
+                self.assertEqual(saved.last_execution.get("candidate_map_batch_count"), len(batch_plans))
+                self.assertEqual(saved.last_execution.get("candidate_map_batch_top_k"), 5)
             # When execute() does not return these fields, scheduler preserves rather
             # than fabricates them; assert optional behavior for compatibility.
             selection_reason = saved.last_execution.get("candidate_map_selection_reason")
