@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from agent.backend_registry import model_building_backend_to_action_name
+from agent.candidate_map_qc import evaluate_candidate_maps, rank_candidate_maps
 from agent.model_building_preflight import preflight_model_building
 
 DEFAULT_MAX_CANDIDATES = 5
@@ -129,12 +130,40 @@ def create_candidate_map_routing_records(
     sequence_path = _sequence_path(state)
     project_path = str(_state_value(state, "project_path", "") or "")
     root = Path(output_root or (Path(project_path) / "CandidateMapModelBuilding" if project_path else "CandidateMapModelBuilding"))
+    selected_candidates = select_candidate_maps(read_candidate_maps(state), max_candidates=max_candidates)
+    evaluated_candidates = evaluate_candidate_maps([dict(x) for x in selected_candidates])
+    ranked_candidates = rank_candidate_maps(evaluated_candidates)
+    ranked_candidate_maps: List[Dict[str, Any]] = []
 
-    for idx, candidate in enumerate(select_candidate_maps(read_candidate_maps(state), max_candidates=max_candidates)):
+    for fallback_idx, candidate in enumerate(ranked_candidates):
+        candidate_index = candidate.get("candidate_index")
+        if candidate_index is None:
+            candidate_index = fallback_idx
+        candidate_map_qc = candidate.get("candidate_map_qc") if isinstance(candidate.get("candidate_map_qc"), dict) else {}
+        qc_score = float(candidate.get("qc_score") or candidate_map_qc.get("qc_score") or 0.0)
+        qc_status = str(candidate.get("qc_status") or candidate_map_qc.get("qc_status") or "failed")
+        qc_reason = str(candidate.get("qc_reason") or candidate_map_qc.get("qc_reason") or "")
+        ranked_candidate_maps.append(
+            {
+                "candidate_index": candidate_index,
+                "project_path": project_path or None,
+                "map_path": candidate.get("map_path"),
+                "source_backend": candidate.get("source_backend"),
+                "source_run_dir": candidate.get("source_run_dir"),
+                "latent_source": candidate.get("latent_source"),
+                "weights_path": candidate.get("weights_path"),
+                "qc_score": qc_score,
+                "qc_status": qc_status,
+                "qc_reason": qc_reason,
+                "candidate_map_qc": candidate_map_qc,
+                "qc_rank": fallback_idx,
+            }
+        )
         map_path = _candidate_map_path(candidate)
         exists = bool(map_path and map_path.is_file())
         record: Dict[str, Any] = {
-            "candidate_index": idx,
+            "candidate_index": candidate_index,
+            "project_path": project_path or None,
             "source_backend": candidate.get("source_backend"),
             "source_run_dir": candidate.get("source_run_dir"),
             "map_path": str(map_path) if map_path else None,
@@ -142,6 +171,11 @@ def create_candidate_map_routing_records(
             "latent_source": candidate.get("latent_source"),
             "weights_path": candidate.get("weights_path"),
             "candidate_qc_status": candidate.get("qc_status"),
+            "candidate_map_qc": candidate_map_qc,
+            "qc_score": qc_score,
+            "qc_status": qc_status,
+            "qc_reason": qc_reason,
+            "qc_rank": fallback_idx,
             "branch_name": BRANCH_NAME,
         }
         if not exists:
@@ -164,7 +198,7 @@ def create_candidate_map_routing_records(
 
         base_params = {
             "map_path": str(map_path),
-            "output_dir": str(root / f"candidate_{idx:03d}"),
+            "output_dir": str(root / f"candidate_{int(candidate_index):03d}"),
         }
         backend, pf, reason = _choose_backend(
             base_params=base_params,
@@ -194,6 +228,18 @@ def create_candidate_map_routing_records(
             }
         )
         records.append(record)
+    if not records:
+        return records
+    selected = records[0]
+    selected_candidate_index = selected.get("candidate_index")
+    selected_candidate_qc_score = float(selected.get("qc_score") or 0.0)
+    selection_reason = "highest_qc_score"
+    for record in records:
+        record["selected_candidate_index"] = selected_candidate_index
+        record["selected_candidate_qc_score"] = selected_candidate_qc_score
+        record["candidate_map_selection_reason"] = selection_reason
+        record["selected_candidate"] = record.get("candidate_index") == selected_candidate_index
+        record["ranked_candidate_maps"] = list(ranked_candidate_maps)
     return records
 
 
@@ -211,6 +257,11 @@ def action_parameters_from_record(record: Dict[str, Any]) -> Dict[str, Any]:
         "latent_source": record.get("latent_source"),
         "weights_path": record.get("weights_path"),
         "candidate_qc_status": record.get("candidate_qc_status"),
+        "candidate_map_qc": record.get("candidate_map_qc"),
+        "selected_candidate_qc_score": record.get("selected_candidate_qc_score", record.get("qc_score")),
+        "candidate_map_selection_reason": record.get("candidate_map_selection_reason", "highest_qc_score"),
+        "selected_candidate_index": record.get("selected_candidate_index", record.get("candidate_index")),
+        "ranked_candidate_maps": record.get("ranked_candidate_maps"),
         "candidate_map_routing_record": record,
         "routing_reason": record.get("routing_reason"),
         "routing_triggered": True,

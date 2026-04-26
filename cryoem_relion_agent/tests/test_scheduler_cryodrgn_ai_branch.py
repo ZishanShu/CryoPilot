@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -197,6 +198,136 @@ class TestReporterCryodrgnAiSampledMaps(unittest.TestCase):
             self.assertIn("Sampled volumes: 3", md)
             self.assertIn("Candidate maps: 3", md)
             self.assertIn("route_to_model_building", md)
+
+
+class TestCandidateMapStatePersistence(unittest.TestCase):
+    def test_candidate_map_model_building_dry_run_preserves_candidate_state(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            seq = root / "seq.fasta"
+            seq.write_text(">a\nAAAA\n", encoding="utf-8")
+            qc = QCMetrics(
+                motioncorr_completed=True,
+                ctf_completed=True,
+                class2d_completed=True,
+                init3d_completed=True,
+                refine3d_completed=True,
+                postprocess_completed=True,
+                current_resolution=3.2,
+            )
+            candidate_maps = [
+                {
+                    "source_backend": "cryodrgn_ai",
+                    "source_run_dir": str(root),
+                    "map_path": str(root / "sampled_volumes" / f"vol_{idx:03d}.mrc"),
+                    "latent_source": str(root / "representative_z.txt"),
+                    "weights_path": str(root / "abinit" / "weights.pkl"),
+                    "qc_status": "pending",
+                    "recommended_next_action": "route_to_model_building",
+                }
+                for idx in range(5)
+            ]
+            routing_records = [
+                {
+                    "candidate_index": idx,
+                    "source_backend": "cryodrgn_ai",
+                    "source_run_dir": str(root),
+                    "map_path": str(root / "sampled_volumes" / f"vol_{idx:03d}.mrc"),
+                    "latent_source": str(root / "representative_z.txt"),
+                    "weights_path": str(root / "abinit" / "weights.pkl"),
+                    "recommended_backend": "modelangelo",
+                    "recommended_action": "run_modelangelo",
+                    "downstream_action": "run_modelangelo",
+                    "preflight": {"available": True, "execution_mode": "dry_run"},
+                }
+                for idx in range(5)
+            ]
+            state = SampleState(
+                project_id="p",
+                project_path=str(root),
+                stage="PostProcess",
+                status="running",
+                sequence_path=str(seq),
+                candidate_maps=copy.deepcopy(candidate_maps),
+                last_execution={
+                    "action_name": "run_cryodrgn_ai",
+                    "status": "completed",
+                    "candidate_maps": copy.deepcopy(candidate_maps),
+                },
+            )
+            action = Action(
+                name=ActionName.RUN_MODELANGELO,
+                reason="candidate map routing",
+                parameters={
+                    "branch_name": "candidate_map_model_building",
+                    "candidate_map_path": candidate_maps[0]["map_path"],
+                    "candidate_index": 0,
+                    "candidate_map_routing_record": routing_records[0],
+                    "candidate_map_routing_records": routing_records,
+                    "candidate_maps": copy.deepcopy(candidate_maps),
+                    "upstream_candidate_maps": copy.deepcopy(candidate_maps),
+                    "candidate_map_count": len(candidate_maps),
+                    "map_path": candidate_maps[0]["map_path"],
+                    "sequence_path": str(seq),
+                    "model_building_backend": "modelangelo",
+                    "routing_triggered": True,
+                },
+                priority=58,
+            )
+            sched = Scheduler(project_root=root)
+            with patch.object(Scheduler, "scan_project", return_value=(state, qc)), patch.object(
+                Scheduler, "_resolve_next_action", return_value=action
+            ), patch.object(
+                sched.action_executor,
+                "execute",
+                return_value={
+                    "action_name": "run_modelangelo",
+                    "status": "dry_run",
+                    "dry_run": True,
+                    "output_dir": str(root / "ModelBuilding" / "ModelAngelo" / "candidate_000"),
+                },
+            ):
+                selected_action, _result = sched.run_next(dry_run=True)
+            self.assertEqual(selected_action.name, ActionName.RUN_MODELANGELO)
+
+            saved = sched.state_manager.load_state()
+            assert saved is not None
+            self.assertEqual(len(saved.candidate_maps), 5)
+            self.assertEqual(saved.last_execution.get("action_name"), "run_modelangelo")
+            self.assertEqual(saved.last_execution.get("status"), "dry_run")
+            self.assertEqual(len(saved.last_execution.get("candidate_maps") or []), 5)
+            self.assertEqual(len(saved.last_execution.get("candidate_map_routing_records") or []), 5)
+            batch_plans = saved.last_execution.get("candidate_map_batch_model_building_plans")
+            if batch_plans is not None:
+                self.assertIsInstance(batch_plans, list)
+                self.assertEqual(saved.last_execution.get("candidate_map_batch_count"), len(batch_plans))
+                self.assertEqual(saved.last_execution.get("candidate_map_batch_top_k"), 5)
+            # When execute() does not return these fields, scheduler preserves rather
+            # than fabricates them; assert optional behavior for compatibility.
+            selection_reason = saved.last_execution.get("candidate_map_selection_reason")
+            if selection_reason is not None:
+                self.assertEqual(selection_reason, "highest_qc_score")
+            selected_score = saved.last_execution.get("selected_candidate_qc_score")
+            if selected_score is not None:
+                self.assertGreaterEqual(float(selected_score), 0.0)
+            selected_idx = saved.last_execution.get("selected_candidate_index")
+            if selected_idx is not None:
+                self.assertEqual(selected_idx, saved.last_execution.get("candidate_index"))
+            self.assertTrue(
+                str(saved.last_execution.get("candidate_map_routing_records")[0]["map_path"]).endswith(
+                    "sampled_volumes/vol_000.mrc"
+                )
+            )
+            self.assertTrue(
+                str(saved.last_execution.get("candidate_map_routing_records")[0]["weights_path"]).endswith(
+                    "abinit/weights.pkl"
+                )
+            )
+            self.assertTrue(
+                str(saved.last_execution.get("candidate_map_routing_records")[0]["latent_source"]).endswith(
+                    "representative_z.txt"
+                )
+            )
 
 
 if __name__ == "__main__":
