@@ -82,6 +82,12 @@ class PipelineReport(BaseModel):
         description="Structured reconstruction preflight for optional backends such as cryodrgn_ai.",
     )
     candidate_map_routing: List[Dict[str, Any]] = Field(default_factory=list)
+    ranked_candidate_maps: List[Dict[str, Any]] = Field(default_factory=list)
+    selected_candidate_index: Optional[int] = None
+    selected_candidate_qc_score: Optional[float] = None
+    candidate_map_selection_reason: Optional[str] = None
+    selected_candidate_backend: Optional[str] = None
+    selected_candidate_action: Optional[str] = None
     capability_matrix: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     backend_selection: Dict[str, Optional[Dict[str, Any]]] = Field(default_factory=dict)
     benchmark_summary: Optional[Dict[str, Any]] = None
@@ -221,19 +227,40 @@ class PipelineReport(BaseModel):
             for record in self.candidate_map_routing[:5]:
                 pf = record.get("preflight") if isinstance(record.get("preflight"), dict) else {}
                 status = "available" if pf.get("available") else "unavailable"
+                lines.append(f"- candidate {record.get('candidate_index')}:")
+                lines.append(f"  - map: {record.get('map_path') or 'N/A'}")
+                lines.append(f"  - backend: {record.get('recommended_backend') or 'N/A'}")
                 lines.append(
-                    "- "
-                    f"candidate {record.get('candidate_index')}: "
-                    f"map={record.get('map_path') or 'N/A'} "
-                    f"backend={record.get('recommended_backend') or 'N/A'} "
-                    f"action={record.get('downstream_action') or 'N/A'} "
-                    f"preflight={status} "
-                    f"ready_for={record.get('recommended_backend') or 'ModelAngelo/EModelX/MICA'}"
+                    "  - action: "
+                    f"{record.get('downstream_action') or record.get('recommended_action') or 'N/A'}"
                 )
+                lines.append(f"  - preflight: {status}")
+                lines.append(f"  - latent_source: {record.get('latent_source') or 'N/A'}")
+                lines.append(f"  - weights_path: {record.get('weights_path') or 'N/A'}")
                 if pf.get("blocked_reason"):
                     lines.append(f"  - blocked_reason: {pf.get('blocked_reason')}")
         else:
             lines.append("- No candidate maps available for routing")
+        lines.append("")
+        lines.append("## Candidate Map QC Ranking")
+        lines.append(f"- Candidate maps: {len(self.ranked_candidate_maps) or candidate_count}")
+        lines.append(f"- Selected candidate index: {self.selected_candidate_index if self.selected_candidate_index is not None else 'N/A'}")
+        if self.selected_candidate_qc_score is not None:
+            lines.append(f"- Selected candidate qc_score: {self.selected_candidate_qc_score:.3f}")
+        else:
+            lines.append("- Selected candidate qc_score: N/A")
+        lines.append(f"- Selection reason: {self.candidate_map_selection_reason or 'N/A'}")
+        lines.append(f"- Selected backend/action: {(self.selected_candidate_backend or 'N/A')} / {(self.selected_candidate_action or 'N/A')}")
+        if self.ranked_candidate_maps:
+            for row in self.ranked_candidate_maps[:5]:
+                lines.append(f"- candidate {row.get('candidate_index')}:")
+                lines.append(f"  - map: {row.get('map_path') or 'N/A'}")
+                lines.append(f"  - qc_score: {row.get('qc_score')}")
+                lines.append(f"  - qc_status: {row.get('qc_status') or 'N/A'}")
+                lines.append(f"  - latent_source: {row.get('latent_source') or 'N/A'}")
+                lines.append(f"  - weights_path: {row.get('weights_path') or 'N/A'}")
+        else:
+            lines.append("- No ranked candidate maps available")
         if self.extra.get("model_building_backend"):
             lines.append(f"- Model-building backend: {self.extra.get('model_building_backend')}")
         if self.extra.get("model_selection_reason"):

@@ -11,8 +11,6 @@ from agent.candidate_map_router import create_candidate_map_routing_records, rea
 from schemas.action import Action
 from schemas.action_history import ActionHistoryEntry
 from schemas.qc_metrics import QCMetrics
-from agent.candidate_map_router import create_candidate_map_routing_records, read_candidate_maps
-from agent.candidate_map_router import create_candidate_map_routing_records, read_candidate_maps
 from schemas.report import ExecutionSummary, PipelineReport, RoutingDecision
 from schemas.sample_state import SampleState
 
@@ -462,6 +460,100 @@ class Reporter:
                 candidate_map_routing = [x for x in raw_records if isinstance(x, dict)]
         if not candidate_map_routing:
             candidate_map_routing = create_candidate_map_routing_records(state, max_candidates=5)
+        ranked_candidate_maps: List[Dict[str, Any]] = []
+        selected_candidate_index: Optional[int] = None
+        selected_candidate_qc_score: Optional[float] = None
+        candidate_map_selection_reason: Optional[str] = None
+        selected_candidate_backend: Optional[str] = None
+        selected_candidate_action: Optional[str] = None
+        if next_action and isinstance(next_action.parameters, dict):
+            ranked_raw = next_action.parameters.get("ranked_candidate_maps")
+            if isinstance(ranked_raw, list):
+                ranked_candidate_maps = [x for x in ranked_raw if isinstance(x, dict)]
+            if next_action.parameters.get("selected_candidate_index") is not None:
+                try:
+                    selected_candidate_index = int(next_action.parameters.get("selected_candidate_index"))
+                except (TypeError, ValueError):
+                    selected_candidate_index = None
+            if next_action.parameters.get("selected_candidate_qc_score") is not None:
+                try:
+                    selected_candidate_qc_score = float(next_action.parameters.get("selected_candidate_qc_score"))
+                except (TypeError, ValueError):
+                    selected_candidate_qc_score = None
+            if next_action.parameters.get("candidate_map_selection_reason"):
+                candidate_map_selection_reason = str(next_action.parameters.get("candidate_map_selection_reason"))
+        if not ranked_candidate_maps and candidate_map_routing:
+            from_records = candidate_map_routing[0].get("ranked_candidate_maps")
+            if isinstance(from_records, list):
+                ranked_candidate_maps = [x for x in from_records if isinstance(x, dict)]
+        if not ranked_candidate_maps and candidate_map_routing:
+            ranked_candidate_maps = sorted(
+                [
+                    {
+                        "candidate_index": row.get("candidate_index"),
+                        "map_path": row.get("map_path"),
+                        "source_backend": row.get("source_backend"),
+                        "source_run_dir": row.get("source_run_dir"),
+                        "latent_source": row.get("latent_source"),
+                        "weights_path": row.get("weights_path"),
+                        "qc_score": row.get("qc_score"),
+                        "qc_status": row.get("qc_status"),
+                        "qc_reason": row.get("qc_reason"),
+                        "candidate_map_qc": row.get("candidate_map_qc"),
+                        "qc_rank": row.get("qc_rank"),
+                    }
+                    for row in candidate_map_routing
+                ],
+                key=lambda x: (
+                    int(x.get("qc_rank") if x.get("qc_rank") is not None else 999999),
+                    -float(x.get("qc_score") or 0.0),
+                    int(x.get("candidate_index") or 0),
+                ),
+            )
+        if selected_candidate_index is None and candidate_map_routing:
+            raw_selected = candidate_map_routing[0].get("selected_candidate_index")
+            if raw_selected is not None:
+                try:
+                    selected_candidate_index = int(raw_selected)
+                except (TypeError, ValueError):
+                    selected_candidate_index = None
+        if selected_candidate_index is None and ranked_candidate_maps:
+            top_idx = ranked_candidate_maps[0].get("candidate_index")
+            if top_idx is not None:
+                try:
+                    selected_candidate_index = int(top_idx)
+                except (TypeError, ValueError):
+                    selected_candidate_index = None
+        if candidate_map_selection_reason is None and candidate_map_routing:
+            raw_reason = candidate_map_routing[0].get("candidate_map_selection_reason")
+            if raw_reason:
+                candidate_map_selection_reason = str(raw_reason)
+        if candidate_map_selection_reason is None and ranked_candidate_maps:
+            candidate_map_selection_reason = "highest_qc_score"
+        selected_record: Optional[Dict[str, Any]] = None
+        if selected_candidate_index is not None and candidate_map_routing:
+            selected_record = next(
+                (x for x in candidate_map_routing if int(x.get("candidate_index") or -1) == selected_candidate_index),
+                None,
+            )
+        if selected_record is None and candidate_map_routing:
+            selected_record = candidate_map_routing[0]
+        if selected_record is not None:
+            if selected_candidate_qc_score is None:
+                raw_score = selected_record.get("selected_candidate_qc_score")
+                if raw_score is None:
+                    raw_score = selected_record.get("qc_score")
+                if raw_score is not None:
+                    try:
+                        selected_candidate_qc_score = float(raw_score)
+                    except (TypeError, ValueError):
+                        selected_candidate_qc_score = None
+            if selected_record.get("recommended_backend"):
+                selected_candidate_backend = str(selected_record.get("recommended_backend"))
+            if selected_record.get("downstream_action") or selected_record.get("recommended_action"):
+                selected_candidate_action = str(
+                    selected_record.get("downstream_action") or selected_record.get("recommended_action")
+                )
         extra: Dict[str, str] = {}
         if picking_backend:
             extra["picking_backend"] = picking_backend
@@ -557,6 +649,16 @@ class Reporter:
         if candidate_map_routing:
             extra["candidate_map_count"] = str(len(read_candidate_maps(state)))
             extra["candidate_map_routing_count"] = str(len(candidate_map_routing))
+        if selected_candidate_index is not None:
+            extra["selected_candidate_index"] = str(selected_candidate_index)
+        if selected_candidate_qc_score is not None:
+            extra["selected_candidate_qc_score"] = str(selected_candidate_qc_score)
+        if candidate_map_selection_reason:
+            extra["candidate_map_selection_reason"] = candidate_map_selection_reason
+        if selected_candidate_backend:
+            extra["selected_candidate_backend"] = selected_candidate_backend
+        if selected_candidate_action:
+            extra["selected_candidate_action"] = selected_candidate_action
 
         picking_qc: Optional[Dict[str, Any]] = None
         if state.last_execution:
@@ -590,6 +692,12 @@ class Reporter:
             cryodrgn_ai_preflight=cryodrgn_ai_preflight,
             reconstruction_preflight=cryodrgn_ai_preflight,
             candidate_map_routing=candidate_map_routing,
+            ranked_candidate_maps=ranked_candidate_maps,
+            selected_candidate_index=selected_candidate_index,
+            selected_candidate_qc_score=selected_candidate_qc_score,
+            candidate_map_selection_reason=candidate_map_selection_reason,
+            selected_candidate_backend=selected_candidate_backend,
+            selected_candidate_action=selected_candidate_action,
             capability_matrix=capability_matrix or {},
             backend_selection={
                 "picking": (next_action.parameters.get("picking_selection_decision") if next_action and isinstance(next_action.parameters, dict) else None),
