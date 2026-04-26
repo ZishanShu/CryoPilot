@@ -134,7 +134,16 @@ class TestCandidateMapRouter(unittest.TestCase):
             map_path="/tmp/map.mrc",
             sequence_path="/tmp/seq.fasta",
         )
-        qc = QCMetrics(refine3d_completed=True, current_resolution=3.8)
+        qc = QCMetrics(
+            motioncorr_completed=True,
+            ctf_completed=True,
+            picking_completed=True,
+            class2d_completed=True,
+            init3d_completed=True,
+            refine3d_completed=True,
+            postprocess_completed=True,
+            current_resolution=3.8,
+        )
         action = Scheduler(project_root=Path("/tmp/project"))._resolve_next_action(state, qc)
         self.assertEqual(action.name, ActionName.RUN_MODELANGELO)
         self.assertNotEqual(action.parameters.get("branch_name"), "candidate_map_model_building")
