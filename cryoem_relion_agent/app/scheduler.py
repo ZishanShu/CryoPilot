@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -237,6 +238,13 @@ class Scheduler:
             and not getattr(state, "last_execution", None)
         ):
             state.last_execution = persisted.last_execution
+        if (
+            persisted is not None
+            and isinstance(getattr(persisted, "candidate_maps", None), list)
+            and persisted.candidate_maps
+            and not getattr(state, "candidate_maps", None)
+        ):
+            state.candidate_maps = copy.deepcopy(persisted.candidate_maps)
 
         if persist_state:
             self.state_manager.save_state(state)
@@ -536,6 +544,8 @@ class Scheduler:
             name = ActionName.RUN_VALIDATION
         params = action_parameters_from_record(selected)
         params["candidate_map_routing_records"] = records
+        params["candidate_maps"] = copy.deepcopy(candidates)
+        params["upstream_candidate_maps"] = copy.deepcopy(candidates)
         params["candidate_map_count"] = len(candidates)
         params["candidate_map_selected_count"] = len(records)
         params.setdefault("routing_reason", selected.get("routing_reason"))
@@ -546,6 +556,97 @@ class Scheduler:
             parameters=params,
             priority=int(priority),
         )
+
+    @staticmethod
+    def _is_candidate_map_model_building_action(action: Action) -> bool:
+        params = action.parameters if isinstance(action.parameters, dict) else {}
+        return str(params.get("branch_name") or "").strip() == "candidate_map_model_building"
+
+    @staticmethod
+    def _candidate_value_or_none(*values: Any) -> Any:
+        for value in values:
+            if isinstance(value, list):
+                if value:
+                    return copy.deepcopy(value)
+                continue
+            if isinstance(value, dict):
+                if value:
+                    return copy.deepcopy(value)
+                continue
+            if isinstance(value, str):
+                if value.strip():
+                    return value
+                continue
+            if value is not None:
+                return value
+        return None
+
+    def _merge_candidate_map_execution_payload(
+        self,
+        *,
+        action: Action,
+        result_payload: Dict[str, Any],
+        previous_last_execution: Dict[str, Any],
+        existing_candidate_maps: list[Any],
+    ) -> tuple[Dict[str, Any], list[Any]]:
+        payload = dict(result_payload)
+        explicit_replacement = payload.get("candidate_maps")
+        if isinstance(explicit_replacement, list) and explicit_replacement:
+            explicit_replacement = copy.deepcopy(explicit_replacement)
+        else:
+            explicit_replacement = None
+
+        if not self._is_candidate_map_model_building_action(action):
+            return payload, explicit_replacement or copy.deepcopy(existing_candidate_maps)
+
+        params = action.parameters if isinstance(action.parameters, dict) else {}
+        previous = previous_last_execution if isinstance(previous_last_execution, dict) else {}
+        preserve_keys = (
+            "candidate_map_path",
+            "candidate_index",
+            "candidate_map_routing_record",
+            "candidate_map_routing_records",
+            "candidate_map_count",
+        )
+        for key in preserve_keys:
+            if key in payload and payload.get(key) not in (None, "", [], {}):
+                continue
+            merged = self._candidate_value_or_none(params.get(key), previous.get(key))
+            if merged is not None:
+                payload[key] = merged
+
+        if explicit_replacement is not None:
+            candidate_maps = explicit_replacement
+        else:
+            candidate_maps = self._candidate_value_or_none(
+                existing_candidate_maps,
+                params.get("candidate_maps"),
+                previous.get("candidate_maps"),
+                params.get("upstream_candidate_maps"),
+                previous.get("upstream_candidate_maps"),
+            )
+            if not isinstance(candidate_maps, list):
+                candidate_maps = []
+        if candidate_maps:
+            payload["candidate_maps"] = copy.deepcopy(candidate_maps)
+
+        upstream_candidate_maps = self._candidate_value_or_none(
+            params.get("upstream_candidate_maps"),
+            payload.get("candidate_maps"),
+            previous.get("upstream_candidate_maps"),
+        )
+        if isinstance(upstream_candidate_maps, list) and upstream_candidate_maps:
+            payload["upstream_candidate_maps"] = copy.deepcopy(upstream_candidate_maps)
+
+        if payload.get("candidate_map_count") is None:
+            if isinstance(payload.get("candidate_maps"), list) and payload["candidate_maps"]:
+                payload["candidate_map_count"] = len(payload["candidate_maps"])
+            elif params.get("candidate_map_count") is not None:
+                payload["candidate_map_count"] = params.get("candidate_map_count")
+            elif previous.get("candidate_map_count") is not None:
+                payload["candidate_map_count"] = previous.get("candidate_map_count")
+
+        return payload, copy.deepcopy(candidate_maps)
 
 
     def _resolve_next_action(
@@ -791,6 +892,8 @@ class Scheduler:
             dry_run=dry_run,
             state=state,
         )
+        previous_last_execution = dict(state.last_execution) if isinstance(state.last_execution, dict) else {}
+        existing_candidate_maps = list(getattr(state, "candidate_maps", []) or [])
         if isinstance(result, dict) and action.name == ActionName.RUN_AUTOPICK:
             pk = str(action.parameters.get("picking_backend") or "").strip()
             if pk:
@@ -897,7 +1000,14 @@ class Scheduler:
         if isinstance(result, dict):
             result.setdefault("run_id", run_id)
             result.setdefault("parent_decision_id", decision_entry_id)
-            state.last_execution = result
+            merged_execution, merged_candidate_maps = self._merge_candidate_map_execution_payload(
+                action=action,
+                result_payload=result,
+                previous_last_execution=previous_last_execution,
+                existing_candidate_maps=existing_candidate_maps,
+            )
+            state.last_execution = merged_execution
+            state.candidate_maps = merged_candidate_maps
             if result.get("action_name") == "run_modelangelo":
                 note = (
                     f"run_modelangelo: status={result.get('status')} "

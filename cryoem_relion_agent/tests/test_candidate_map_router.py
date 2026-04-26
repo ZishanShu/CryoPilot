@@ -17,8 +17,8 @@ def _candidate(path: Path, idx: int) -> dict:
         "source_backend": "cryodrgn_ai",
         "source_run_dir": str(path.parent),
         "map_path": str(path),
-        "latent_source": f"z.{idx}.pkl",
-        "weights_path": "weights.pkl",
+        "latent_source": str(path.parent / "representative_z.txt"),
+        "weights_path": str(path.parent / "abinit" / "weights.pkl"),
         "qc_status": "not_evaluated",
         "recommended_next_action": "route_to_model_building",
     }
@@ -103,13 +103,18 @@ class TestCandidateMapRouter(unittest.TestCase):
             root = Path(tmp)
             seq = root / "seq.fasta"
             seq.write_text(">a\nA\n", encoding="utf-8")
-            m = root / "candidate.mrc"
+            m = root / "sampled_volumes" / "vol_000.mrc"
+            m.parent.mkdir(parents=True, exist_ok=True)
             m.write_text("map", encoding="utf-8")
+            (root / "representative_z.txt").write_text("0 0 0\n", encoding="utf-8")
+            (root / "abinit").mkdir(parents=True, exist_ok=True)
+            (root / "abinit" / "weights.pkl").write_bytes(b"w")
             state = SampleState(
                 project_id="p",
                 project_path=str(root),
                 stage="PostProcess",
                 status="running",
+                candidate_maps=[_candidate(m, 0)],
                 sequence_path=str(seq),
                 last_execution={"candidate_maps": [_candidate(m, 0)]},
             )
@@ -123,7 +128,9 @@ class TestCandidateMapRouter(unittest.TestCase):
             self.assertIn("## Candidate Map Routing", md)
             self.assertIn("Candidate count: 1", md)
             self.assertIn(str(m), md)
-            self.assertIn("backend=modelangelo", md)
+            self.assertIn("backend: modelangelo", md)
+            self.assertIn("weights.pkl", md)
+            self.assertIn("representative_z.txt", md)
 
     def test_no_candidate_maps_keeps_existing_behavior(self) -> None:
         state = SampleState(

@@ -221,15 +221,16 @@ class PipelineReport(BaseModel):
             for record in self.candidate_map_routing[:5]:
                 pf = record.get("preflight") if isinstance(record.get("preflight"), dict) else {}
                 status = "available" if pf.get("available") else "unavailable"
+                lines.append(f"- candidate {record.get('candidate_index')}:")
+                lines.append(f"  - map: {record.get('map_path') or 'N/A'}")
+                lines.append(f"  - backend: {record.get('recommended_backend') or 'N/A'}")
                 lines.append(
-                    "- "
-                    f"candidate {record.get('candidate_index')}: "
-                    f"map={record.get('map_path') or 'N/A'} "
-                    f"backend={record.get('recommended_backend') or 'N/A'} "
-                    f"action={record.get('downstream_action') or 'N/A'} "
-                    f"preflight={status} "
-                    f"ready_for={record.get('recommended_backend') or 'ModelAngelo/EModelX/MICA'}"
+                    "  - action: "
+                    f"{record.get('downstream_action') or record.get('recommended_action') or 'N/A'}"
                 )
+                lines.append(f"  - preflight: {status}")
+                lines.append(f"  - latent_source: {record.get('latent_source') or 'N/A'}")
+                lines.append(f"  - weights_path: {record.get('weights_path') or 'N/A'}")
                 if pf.get("blocked_reason"):
                     lines.append(f"  - blocked_reason: {pf.get('blocked_reason')}")
         else:
