@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -9,6 +10,11 @@ from uuid import uuid4
 
 from agent.backend_registry import get_backend_capability_matrix
 from agent.backend_registry import model_action_to_backend, model_building_backend_to_action_name
+from agent.candidate_map_router import (
+    action_parameters_from_record,
+    create_candidate_map_routing_records,
+    read_candidate_maps,
+)
 from agent.model_building_preflight import preflight_model_building
 from agent.heterogeneity_preflight import enrich_and_preflight_cryodrgn_params
 from agent.picking_preflight import enrich_and_preflight_topaz_params
@@ -147,6 +153,8 @@ class Scheduler:
         execution_mode = str(action.parameters.get("execution_mode", "")).strip()
         if action.name == ActionName.RUN_CRYODRGN_AI and execution_mode:
             tags.append(f"execution_mode={execution_mode}")
+        if action.parameters.get("candidate_index") is not None:
+            tags.append(f"candidate_index={action.parameters.get('candidate_index')}")
         model_building_backend = str(action.parameters.get("model_building_backend", "")).strip()
         if model_building_backend:
             tags.append(f"model_building_backend={model_building_backend}")
@@ -230,6 +238,13 @@ class Scheduler:
             and not getattr(state, "last_execution", None)
         ):
             state.last_execution = persisted.last_execution
+        if (
+            persisted is not None
+            and isinstance(getattr(persisted, "candidate_maps", None), list)
+            and persisted.candidate_maps
+            and not getattr(state, "candidate_maps", None)
+        ):
+            state.candidate_maps = copy.deepcopy(persisted.candidate_maps)
 
         if persist_state:
             self.state_manager.save_state(state)
@@ -464,6 +479,175 @@ class Scheduler:
             priority=int(self.policy_engine.rules.get("priorities", {}).get("run_cryodrgn_ai", 67)),
         )
 
+    def _candidate_map_context(self, state, modeling_context: Optional[ModelingContext]) -> Dict[str, Any]:
+        ctx: Dict[str, Any] = {}
+        last = state.last_execution if isinstance(getattr(state, "last_execution", None), dict) else {}
+        if isinstance(last, dict):
+            raw = last.get("candidate_map_routing_context")
+            if isinstance(raw, dict):
+                ctx.update(raw)
+            if last.get("af3_dir") and "af3_dir" not in ctx:
+                ctx["af3_dir"] = last.get("af3_dir")
+            if last.get("allow_seq_free") is not None and "allow_seq_free" not in ctx:
+                ctx["allow_seq_free"] = last.get("allow_seq_free")
+        if modeling_context is not None:
+            if getattr(modeling_context, "af3_dir", None):
+                ctx["af3_dir"] = str(modeling_context.af3_dir)
+            if getattr(modeling_context, "chain_count", None):
+                ctx["chain_count"] = modeling_context.chain_count
+            if not getattr(modeling_context, "known_sequence", False) and not getattr(state, "sequence_path", None):
+                ctx.setdefault("allow_seq_free", True)
+            raw = getattr(modeling_context, "candidate_map_routing_context", None)
+            if isinstance(raw, dict):
+                ctx.update(raw)
+        return ctx
+
+    def _maybe_candidate_map_model_building_action(
+        self,
+        state,
+        qc,
+        modeling_context: Optional[ModelingContext] = None,
+        *,
+        preferred_picking_backend: Optional[str] = None,
+    ) -> Optional[Action]:
+        """Route candidate maps only when the normal scheduler is at model-building time."""
+
+        candidates = read_candidate_maps(state)
+        if not candidates:
+            return None
+        probe = self.policy_engine.decide_next_action(
+            state,
+            qc,
+            log_history=False,
+            preferred_picking_backend=preferred_picking_backend,
+        )
+        if probe is not None and probe.name not in {ActionName.RUN_VALIDATION}:
+            return None
+
+        ctx = self._candidate_map_context(state, modeling_context)
+        records = create_candidate_map_routing_records(
+            state,
+            max_candidates=int(ctx.get("max_candidates") or 5),
+            allow_seq_free=bool(ctx.get("allow_seq_free") or ctx.get("seq_free_allowed")),
+            af3_dir=ctx.get("af3_dir"),
+            output_root=ctx.get("output_root"),
+            emodelx_config_path=self.config_dir / "emodelx.yaml",
+            mica_config_path=self.config_dir / "mica.yaml",
+        )
+        if not records:
+            return None
+        selected = next((r for r in records if r.get("downstream_action")), records[0])
+        action_name = selected.get("downstream_action") or "run_validation"
+        try:
+            name = ActionName(str(action_name))
+        except ValueError:
+            name = ActionName.RUN_VALIDATION
+        params = action_parameters_from_record(selected)
+        params["candidate_map_routing_records"] = records
+        params["candidate_maps"] = copy.deepcopy(candidates)
+        params["upstream_candidate_maps"] = copy.deepcopy(candidates)
+        params["candidate_map_count"] = len(candidates)
+        params["candidate_map_selected_count"] = len(records)
+        params.setdefault("routing_reason", selected.get("routing_reason"))
+        priority = self.structure_router.rules.get("priorities", {}).get(str(action_name), 58)
+        return Action(
+            name=name,
+            reason=f"Route candidate map {selected.get('candidate_index')} to model building.",
+            parameters=params,
+            priority=int(priority),
+        )
+
+    @staticmethod
+    def _is_candidate_map_model_building_action(action: Action) -> bool:
+        params = action.parameters if isinstance(action.parameters, dict) else {}
+        return str(params.get("branch_name") or "").strip() == "candidate_map_model_building"
+
+    @staticmethod
+    def _candidate_value_or_none(*values: Any) -> Any:
+        for value in values:
+            if isinstance(value, list):
+                if value:
+                    return copy.deepcopy(value)
+                continue
+            if isinstance(value, dict):
+                if value:
+                    return copy.deepcopy(value)
+                continue
+            if isinstance(value, str):
+                if value.strip():
+                    return value
+                continue
+            if value is not None:
+                return value
+        return None
+
+    def _merge_candidate_map_execution_payload(
+        self,
+        *,
+        action: Action,
+        result_payload: Dict[str, Any],
+        previous_last_execution: Dict[str, Any],
+        existing_candidate_maps: list[Any],
+    ) -> tuple[Dict[str, Any], list[Any]]:
+        payload = dict(result_payload)
+        explicit_replacement = payload.get("candidate_maps")
+        if isinstance(explicit_replacement, list) and explicit_replacement:
+            explicit_replacement = copy.deepcopy(explicit_replacement)
+        else:
+            explicit_replacement = None
+
+        if not self._is_candidate_map_model_building_action(action):
+            return payload, explicit_replacement or copy.deepcopy(existing_candidate_maps)
+
+        params = action.parameters if isinstance(action.parameters, dict) else {}
+        previous = previous_last_execution if isinstance(previous_last_execution, dict) else {}
+        preserve_keys = (
+            "candidate_map_path",
+            "candidate_index",
+            "candidate_map_routing_record",
+            "candidate_map_routing_records",
+            "candidate_map_count",
+        )
+        for key in preserve_keys:
+            if key in payload and payload.get(key) not in (None, "", [], {}):
+                continue
+            merged = self._candidate_value_or_none(params.get(key), previous.get(key))
+            if merged is not None:
+                payload[key] = merged
+
+        if explicit_replacement is not None:
+            candidate_maps = explicit_replacement
+        else:
+            candidate_maps = self._candidate_value_or_none(
+                existing_candidate_maps,
+                params.get("candidate_maps"),
+                previous.get("candidate_maps"),
+                params.get("upstream_candidate_maps"),
+                previous.get("upstream_candidate_maps"),
+            )
+            if not isinstance(candidate_maps, list):
+                candidate_maps = []
+        if candidate_maps:
+            payload["candidate_maps"] = copy.deepcopy(candidate_maps)
+
+        upstream_candidate_maps = self._candidate_value_or_none(
+            params.get("upstream_candidate_maps"),
+            payload.get("candidate_maps"),
+            previous.get("upstream_candidate_maps"),
+        )
+        if isinstance(upstream_candidate_maps, list) and upstream_candidate_maps:
+            payload["upstream_candidate_maps"] = copy.deepcopy(upstream_candidate_maps)
+
+        if payload.get("candidate_map_count") is None:
+            if isinstance(payload.get("candidate_maps"), list) and payload["candidate_maps"]:
+                payload["candidate_map_count"] = len(payload["candidate_maps"])
+            elif params.get("candidate_map_count") is not None:
+                payload["candidate_map_count"] = params.get("candidate_map_count")
+            elif previous.get("candidate_map_count") is not None:
+                payload["candidate_map_count"] = previous.get("candidate_map_count")
+
+        return payload, copy.deepcopy(candidate_maps)
+
 
     def _resolve_next_action(
         self,
@@ -475,6 +659,15 @@ class Scheduler:
         picking_overrides: Optional[Dict[str, Any]] = None,
     ) -> Action:
         """Apply policy; if it delegates structure routing, call ``StructureRouter``."""
+        candidate_action = self._maybe_candidate_map_model_building_action(
+            state,
+            qc,
+            modeling_context=modeling_context,
+            preferred_picking_backend=preferred_picking_backend,
+        )
+        if candidate_action is not None:
+            return candidate_action
+
         reconstruction_action = self._maybe_reconstruction_action(state, qc, modeling_context=modeling_context)
         if reconstruction_action is not None:
             return reconstruction_action
@@ -699,6 +892,8 @@ class Scheduler:
             dry_run=dry_run,
             state=state,
         )
+        previous_last_execution = dict(state.last_execution) if isinstance(state.last_execution, dict) else {}
+        existing_candidate_maps = list(getattr(state, "candidate_maps", []) or [])
         if isinstance(result, dict) and action.name == ActionName.RUN_AUTOPICK:
             pk = str(action.parameters.get("picking_backend") or "").strip()
             if pk:
@@ -805,7 +1000,14 @@ class Scheduler:
         if isinstance(result, dict):
             result.setdefault("run_id", run_id)
             result.setdefault("parent_decision_id", decision_entry_id)
-            state.last_execution = result
+            merged_execution, merged_candidate_maps = self._merge_candidate_map_execution_payload(
+                action=action,
+                result_payload=result,
+                previous_last_execution=previous_last_execution,
+                existing_candidate_maps=existing_candidate_maps,
+            )
+            state.last_execution = merged_execution
+            state.candidate_maps = merged_candidate_maps
             if result.get("action_name") == "run_modelangelo":
                 note = (
                     f"run_modelangelo: status={result.get('status')} "
