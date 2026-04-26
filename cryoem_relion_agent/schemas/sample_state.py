@@ -31,6 +31,10 @@ class SampleState(BaseModel):
 
     map_path: Optional[str] = Field(default=None, description="Best current map path.")
     sequence_path: Optional[str] = Field(default=None, description="Sequence file path.")
+    candidate_maps: List[Any] = Field(
+        default_factory=list,
+        description="Candidate maps emitted by upstream reconstruction for downstream routing.",
+    )
     last_execution: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Last run-next execution payload (e.g. ModelAngelo result dict).",
