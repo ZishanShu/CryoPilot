@@ -3,7 +3,10 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
+import numpy as np
+import mrcfile
 from agent.candidate_map_router import create_candidate_map_routing_records, read_candidate_maps
 from agent.reporter import Reporter
 from app.scheduler import Scheduler
@@ -97,6 +100,59 @@ class TestCandidateMapRouter(unittest.TestCase):
             self.assertEqual(action.parameters.get("candidate_index"), 0)
             self.assertEqual(action.parameters.get("map_path"), str(m))
             self.assertIsInstance(action.parameters.get("candidate_map_routing_records"), list)
+            self.assertEqual(action.parameters.get("candidate_map_selection_reason"), "highest_qc_score")
+            self.assertIn("selected_candidate_qc_score", action.parameters)
+
+    def test_router_selects_highest_qc_score_candidate(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            seq = root / "seq.fasta"
+            seq.write_text(">a\nA\n", encoding="utf-8")
+            base_map = root / "base_map.mrc"
+            base_map.write_text("map", encoding="utf-8")
+            map_dir = root / "sampled_volumes"
+            map_dir.mkdir(parents=True, exist_ok=True)
+            bad_map = map_dir / "vol_000.mrc"
+            good_map = map_dir / "vol_001.mrc"
+            with mrcfile.new(str(bad_map), overwrite=True) as mrc:
+                mrc.set_data(np.zeros((12, 12, 12), dtype=np.float32))
+            rng = np.random.default_rng(7)
+            with mrcfile.new(str(good_map), overwrite=True) as mrc:
+                mrc.set_data(rng.normal(0.0, 1.0, size=(12, 12, 12)).astype(np.float32))
+            state = SampleState(
+                project_id="p",
+                project_path=str(root),
+                stage="PostProcess",
+                status="running",
+                map_path=str(base_map),
+                sequence_path=str(seq),
+                last_execution={
+                    "candidate_maps": [
+                        _candidate(bad_map, 0),
+                        _candidate(good_map, 1),
+                    ]
+                },
+            )
+            qc = QCMetrics(
+                motioncorr_completed=True,
+                ctf_completed=True,
+                picking_completed=True,
+                class2d_completed=True,
+                init3d_completed=True,
+                refine3d_completed=True,
+                postprocess_completed=True,
+                current_resolution=3.5,
+            )
+            action = Scheduler(project_root=root)._resolve_next_action(state, qc)
+            self.assertEqual(action.name, ActionName.RUN_MODELANGELO)
+            self.assertEqual(action.parameters.get("candidate_map_selection_reason"), "highest_qc_score")
+            self.assertEqual(action.parameters.get("candidate_index"), 1)
+            self.assertEqual(action.parameters.get("candidate_map_path"), str(good_map))
+            self.assertGreater(float(action.parameters.get("selected_candidate_qc_score") or 0.0), 0.0)
+            ranked = action.parameters.get("ranked_candidate_maps") or []
+            self.assertEqual(len(ranked), 2)
+            self.assertEqual(ranked[0].get("candidate_index"), 1)
+            self.assertGreater(float(ranked[0].get("qc_score") or 0.0), float(ranked[1].get("qc_score") or 0.0))
 
     def test_report_includes_candidate_map_routing_section(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -131,6 +187,7 @@ class TestCandidateMapRouter(unittest.TestCase):
             self.assertIn("backend: modelangelo", md)
             self.assertIn("weights.pkl", md)
             self.assertIn("representative_z.txt", md)
+            self.assertIn("Candidate Map QC Ranking", md)
 
     def test_no_candidate_maps_keeps_existing_behavior(self) -> None:
         state = SampleState(
@@ -154,6 +211,36 @@ class TestCandidateMapRouter(unittest.TestCase):
         action = Scheduler(project_root=Path("/tmp/project"))._resolve_next_action(state, qc)
         self.assertEqual(action.name, ActionName.RUN_MODELANGELO)
         self.assertNotEqual(action.parameters.get("branch_name"), "candidate_map_model_building")
+
+    def test_router_missing_mrcfile_graceful_unavailable_qc(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            seq = root / "seq.fasta"
+            seq.write_text(">a\nA\n", encoding="utf-8")
+            map_path = root / "sampled_volumes" / "vol_000.mrc"
+            map_path.parent.mkdir(parents=True, exist_ok=True)
+            map_path.write_bytes(b"fake")
+            state = SampleState(
+                project_id="p",
+                project_path=str(root),
+                stage="PostProcess",
+                status="running",
+                sequence_path=str(seq),
+                last_execution={"candidate_maps": [_candidate(map_path, 0)]},
+            )
+
+            real_import = __import__
+
+            def _blocked_import(name, *args, **kwargs):  # noqa: ANN001
+                if name == "mrcfile":
+                    raise ImportError("blocked")
+                return real_import(name, *args, **kwargs)
+
+            with patch("builtins.__import__", side_effect=_blocked_import):
+                records = create_candidate_map_routing_records(state)
+            self.assertEqual(len(records), 1)
+            self.assertEqual(records[0]["qc_status"], "unavailable")
+            self.assertEqual(records[0]["candidate_map_qc"]["qc_reason"], "mrcfile_unavailable")
 
 
 if __name__ == "__main__":

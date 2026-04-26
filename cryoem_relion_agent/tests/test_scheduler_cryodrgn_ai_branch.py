@@ -297,6 +297,17 @@ class TestCandidateMapStatePersistence(unittest.TestCase):
             self.assertEqual(saved.last_execution.get("status"), "dry_run")
             self.assertEqual(len(saved.last_execution.get("candidate_maps") or []), 5)
             self.assertEqual(len(saved.last_execution.get("candidate_map_routing_records") or []), 5)
+            # When execute() does not return these fields, scheduler preserves rather
+            # than fabricates them; assert optional behavior for compatibility.
+            selection_reason = saved.last_execution.get("candidate_map_selection_reason")
+            if selection_reason is not None:
+                self.assertEqual(selection_reason, "highest_qc_score")
+            selected_score = saved.last_execution.get("selected_candidate_qc_score")
+            if selected_score is not None:
+                self.assertGreaterEqual(float(selected_score), 0.0)
+            selected_idx = saved.last_execution.get("selected_candidate_index")
+            if selected_idx is not None:
+                self.assertEqual(selected_idx, saved.last_execution.get("candidate_index"))
             self.assertTrue(
                 str(saved.last_execution.get("candidate_map_routing_records")[0]["map_path"]).endswith(
                     "sampled_volumes/vol_000.mrc"

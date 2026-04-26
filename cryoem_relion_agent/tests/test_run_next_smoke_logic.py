@@ -34,7 +34,11 @@ class TestRunNextSmokeLogic(unittest.TestCase):
             proj = build_fixture_project(root, "postprocess_ready")
             fasta = proj / "demo.fasta"
             fasta.write_text(">A\nM\n", encoding="utf-8")
-            action, execution = Scheduler(project_root=proj).run_next(
+            sched = Scheduler(project_root=proj)
+            model_builders = root / "model_builders.yaml"
+            model_builders.write_text("model_angelo:\n  executable: model_angelo\n", encoding="utf-8")
+            sched.action_executor.model_builders_yaml = model_builders
+            action, execution = sched.run_next(
                 dry_run=True,
                 sequence_override=fasta,
             )

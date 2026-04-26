@@ -96,6 +96,8 @@ class TestReportStageTransitions(unittest.TestCase):
         self.assertIn("weights.pkl", md)
         self.assertIn("representative_z.txt", md)
         self.assertIn("modelangelo", md)
+        self.assertIn("## Candidate Map QC Ranking", md)
+        self.assertIn("Selected candidate index", md)
 
 
 if __name__ == "__main__":
