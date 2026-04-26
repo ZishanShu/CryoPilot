@@ -218,6 +218,64 @@ def generate_report(
     typer.echo(f"Report generated. stage={report.state.stage}, next_action={report.next_action.name.value if report.next_action else 'N/A'}")
 
 
+@app.command("run-picking-benchmark")
+def run_picking_benchmark(
+    cases_json: Path = typer.Option(
+        ...,
+        "--cases-json",
+        help="Path to benchmark cases JSON (list or {\"cases\": [...]}).",
+    ),
+    out_dir: Path = typer.Option(..., "--out-dir", help="Output directory for benchmark results."),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Dry-run each case without executing subprocesses.",
+    ),
+    threshold_sweep: Optional[str] = typer.Option(
+        None,
+        "--threshold-sweep",
+        help="Comma-separated Topaz thresholds to sweep, e.g. '-8,-7,-6,-5,-4'. Overrides topaz_thresholds in cases JSON.",
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Run picking benchmark suite from a cases JSON file."""
+    setup_logging(verbose)
+    from agent.picking_benchmark import (
+        PickingBenchmarkRunner,
+        expand_threshold_sweep,
+        load_cases_from_json,
+        write_outputs,
+    )
+
+    cases = load_cases_from_json(cases_json)
+    if threshold_sweep:
+        sweep_thresholds = [float(t.strip()) for t in threshold_sweep.split(",") if t.strip()]
+        if sweep_thresholds:
+            for c in cases:
+                if c.picking_backend == "topaz":
+                    c.topaz_thresholds = sweep_thresholds
+
+    expanded: list = []
+    for c in cases:
+        expanded.extend(expand_threshold_sweep(c))
+
+    runner = PickingBenchmarkRunner()
+    summary = runner.run_cases(expanded, dry_run=dry_run)
+    paths = write_outputs(summary, out_dir)
+    typer.echo(
+        json.dumps(
+            {
+                "case_count": summary["case_count"],
+                "qc_passed": summary["qc_passed"],
+                "qc_failed": summary["qc_failed"],
+                "errors": summary["errors"],
+                "outputs": {k: str(v) for k, v in paths.items()},
+            },
+            indent=2,
+        )
+    )
+
+
 @app.command("init-db")
 def init_db(
     db_path: Path = typer.Option(Path("cases.db"), help="Path to sqlite database."),
