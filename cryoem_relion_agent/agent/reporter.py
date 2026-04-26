@@ -207,9 +207,64 @@ class Reporter:
         return None
 
     @staticmethod
-    def _extract_picking_backend(next_action: Optional[Action], history: Sequence[ActionHistoryEntry]) -> Optional[str]:
+    def _picking_backend_from_last_execution(state: SampleState) -> Optional[str]:
+        """Extract picking_backend from state.last_execution (and metadata)."""
+        le = getattr(state, "last_execution", None)
+        if not isinstance(le, dict) or not le:
+            return None
+        v = le.get("picking_backend")
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+        md = le.get("metadata")
+        if isinstance(md, dict):
+            v = md.get("picking_backend")
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+        # Inferred-Topaz: if picking_qc is present and a topaz_output_path exists,
+        # the run that produced QC was a Topaz run.
+        qc = le.get("picking_qc") if isinstance(le, dict) else None
+        if not isinstance(qc, dict) and isinstance(md, dict):
+            qc = md.get("picking_qc")
+        topaz_path = None
+        if isinstance(le, dict):
+            topaz_path = le.get("topaz_output_path")
+        if topaz_path is None and isinstance(md, dict):
+            topaz_path = md.get("topaz_output_path")
+        if isinstance(qc, dict) and topaz_path:
+            return "topaz"
+        return None
+
+    @staticmethod
+    def _extract_picking_backend(
+        next_action: Optional[Action],
+        history: Sequence[ActionHistoryEntry],
+        state: Optional[SampleState] = None,
+    ) -> Optional[str]:
+        # Picking QC gate: when next_action is the gate, the backend that produced
+        # the failed QC is what the report must surface — never an unrelated later
+        # run logged in action_history.
+        if (
+            next_action
+            and next_action.name.value == "request_human_review"
+            and isinstance(next_action.parameters, dict)
+            and next_action.parameters.get("branch_name") == "picking_qc"
+        ):
+            v = str(next_action.parameters.get("picking_backend", "")).strip()
+            if v:
+                return v
+            if state is not None:
+                v2 = Reporter._picking_backend_from_last_execution(state)
+                if v2:
+                    return v2
+            return "topaz"
         if next_action and next_action.name.value == "run_autopick":
             v = str(next_action.parameters.get("picking_backend", "")).strip()
+            if v:
+                return v
+        # If last_execution (and metadata) carry a picking_backend with picking_qc,
+        # prefer it over later unrelated history entries.
+        if state is not None:
+            v = Reporter._picking_backend_from_last_execution(state)
             if v:
                 return v
         for item in reversed(list(history)):
@@ -387,7 +442,9 @@ class Reporter:
         selected_run_id = current_run_id or (report_history[-1].run_id if report_history else None)
         stage_transition_summary = self._summarize_stage_transitions(report_history)
         branch_summaries = self._summarize_branches(report_history)
-        picking_backend = self._extract_picking_backend(next_action=next_action, history=report_history)
+        picking_backend = self._extract_picking_backend(
+            next_action=next_action, history=report_history, state=state
+        )
         heterogeneity_backend = self._extract_heterogeneity_backend(next_action=next_action, history=report_history)
         model_building_backend = self._extract_model_building_backend(next_action=next_action, history=report_history)
         reconstruction_backend = self._extract_reconstruction_backend(next_action=next_action, history=report_history)
@@ -476,6 +533,17 @@ class Reporter:
                 if le.get("output_artifacts"):
                     extra["output_artifacts"] = str(le.get("output_artifacts"))[:1000]
 
+        picking_qc: Optional[Dict[str, Any]] = None
+        if state.last_execution:
+            le = state.last_execution
+            qc_payload = le.get("picking_qc") if isinstance(le, dict) else None
+            if not isinstance(qc_payload, dict):
+                md_payload = le.get("metadata") if isinstance(le, dict) else None
+                if isinstance(md_payload, dict):
+                    qc_payload = md_payload.get("picking_qc")
+            if isinstance(qc_payload, dict):
+                picking_qc = qc_payload
+
         return PipelineReport(
             state=state,
             qc=qc,
@@ -492,6 +560,7 @@ class Reporter:
             extra=extra,
             model_building_preflight=mb_preflight,
             picking_preflight=pk_preflight,
+            picking_qc=picking_qc,
             heterogeneity_preflight=het_preflight,
             cryodrgn_ai_preflight=cryodrgn_ai_preflight,
             reconstruction_preflight=cryodrgn_ai_preflight,

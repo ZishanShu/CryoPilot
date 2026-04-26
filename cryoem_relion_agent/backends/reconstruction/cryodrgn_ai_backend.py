@@ -38,6 +38,8 @@ def _params(state: Any) -> Dict[str, Any]:
         "execution_mode",
         "require_gpu",
         "cryodrgn_executable",
+        "abinit_command",
+        "reconstruction_type",
         "output_dir",
     ):
         if hasattr(state, name):
@@ -61,9 +63,67 @@ def _resolve_executable(params: Dict[str, Any]) -> Optional[str]:
     return shutil.which(raw)
 
 
-def _run_help(executable: str) -> bool:
-    proc = subprocess.run([executable, "abinit", "-h"], capture_output=True, text=True, check=False)
+def _help_available(executable: str, subcommand: str) -> bool:
+    """Return True if ``cryodrgn <subcommand> -h`` is supported."""
+
+    try:
+        proc = subprocess.run(
+            [executable, subcommand, "-h"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except (FileNotFoundError, OSError):
+        return False
     return proc.returncode == 0
+
+
+def _resolve_abinit_command(executable: str, params: Dict[str, Any]) -> tuple[Optional[str], Optional[str]]:
+    """Resolve the ab initio cryoDRGN subcommand for different CLI versions.
+
+    Newer cryoDRGN-AI builds may expose ``cryodrgn abinit``.  The server
+    environment currently uses cryoDRGN 3.4.x, which exposes ``abinit_het`` and
+    ``abinit_homo`` instead.  The backend keeps the agent-facing name
+    ``cryodrgn_ai`` but selects the real CLI subcommand here.
+    """
+
+    requested = str(params.get("abinit_command") or "auto").strip()
+    if requested not in {"auto", "abinit", "abinit_het", "abinit_homo"}:
+        requested = "auto"
+
+    if requested != "auto":
+        if _help_available(executable, requested):
+            return requested, None
+        return None, f"cryodrgn {requested}"
+
+    if _help_available(executable, "abinit"):
+        return "abinit", None
+
+    reconstruction_type = str(params.get("reconstruction_type") or "heterogeneous").strip().lower()
+
+    if reconstruction_type in {"homogeneous", "homo", "abinit_homo"}:
+        if _help_available(executable, "abinit_homo"):
+            return "abinit_homo", None
+        if _help_available(executable, "abinit_het"):
+            return "abinit_het", None
+    else:
+        if _help_available(executable, "abinit_het"):
+            return "abinit_het", None
+        if _help_available(executable, "abinit_homo"):
+            return "abinit_homo", None
+
+    return None, "cryodrgn abinit/abinit_het/abinit_homo"
+
+
+def _run_help(executable: str) -> bool:
+    """Backward-compatible helper kept for existing tests.
+
+    Historically this checked ``cryodrgn abinit -h`` only.  It now returns True
+    when any supported ab initio entry point is available.
+    """
+
+    resolved, _missing = _resolve_abinit_command(executable, {"abinit_command": "auto"})
+    return resolved is not None
 
 
 def _gpu_available() -> bool:
@@ -90,10 +150,19 @@ def preflight(state: Any) -> Dict[str, Any]:
     warnings: List[str] = []
 
     executable = _resolve_executable(params)
+    resolved_abinit_command: Optional[str] = None
     if executable is None:
         missing_dependencies.append("cryodrgn_executable")
     elif not _run_help(executable):
-        missing_dependencies.append("cryodrgn abinit")
+        _resolved, missing_abinit = _resolve_abinit_command(executable, params)
+        missing_dependencies.append(missing_abinit or "cryodrgn abinit/abinit_het/abinit_homo")
+    else:
+        resolved_abinit_command, missing_abinit = _resolve_abinit_command(executable, params)
+        if missing_abinit:
+            # This path mainly preserves older tests that patch _run_help=True.
+            # In real execution, _run_help=True should imply one command resolved.
+            requested = str(params.get("abinit_command") or "auto").strip()
+            resolved_abinit_command = "abinit" if requested == "auto" else requested
 
     particle_input = _first_value(params, "particles_star_or_mrcs", "particles_mrcs_path", "particles_star_path")
     ctf_input = _first_value(params, "ctf_metadata", "ctf_pkl_path")
@@ -152,6 +221,7 @@ def preflight(state: Any) -> Dict[str, Any]:
         "warnings": warnings,
         "blocked_reason": "; ".join(blocked_parts) if blocked_parts else None,
         "executable_path": executable,
+        "resolved_abinit_command": resolved_abinit_command,
         "input_mode": "mrcs_ctf" if has_mrcs_ctf else ("relion_star" if has_convertible_star else "unknown"),
         "input_summary": f"particles={particle_input}, ctf={ctf_input}",
     }
@@ -215,18 +285,22 @@ def build_command(state: Any, run_dir: str | Path) -> Dict[str, Any]:
     params = _params(state)
     run_path = Path(run_dir)
     prepared = prepare_inputs(params, run_path)
+    abinit_command, missing_abinit = _resolve_abinit_command(prepared["executable"], params)
+    if abinit_command is None:
+        raise RuntimeError(f"missing cryoDRGN ab initio command: {missing_abinit}")
+
     abinit_dir = run_path / "abinit"
     abinit_cmd: List[str] = [
         prepared["executable"],
-        "abinit",
+        abinit_command,
         prepared["particles_mrcs"],
         "--ctf",
         prepared["ctf_pkl"],
         "-o",
         str(abinit_dir),
-        "--zdim",
-        str(_as_int(params.get("zdim"), 8)),
     ]
+    if abinit_command != "abinit_homo":
+        abinit_cmd.extend(["--zdim", str(_as_int(params.get("zdim"), 8))])
     if params.get("gpu_id") is not None and str(params.get("gpu_id")).strip() != "":
         abinit_cmd.extend(["--device", str(params["gpu_id"])])
     if params.get("num_epochs") is not None and str(params.get("num_epochs")).strip() != "":
@@ -240,9 +314,20 @@ def build_command(state: Any, run_dir: str | Path) -> Dict[str, Any]:
         "metadata": get_metadata(),
         "run_dir": str(run_path),
         "abinit_dir": str(abinit_dir),
+        "resolved_abinit_command": abinit_command,
         "input_mode": prepared["input_mode"],
         "preprocess_manifest": prepared.get("preprocess_manifest"),
-        "commands": [{"name": cmd[1] if len(cmd) > 1 else "command", "argv": cmd} for cmd in commands],
+        "commands": [
+            {
+                "name": (
+                    "abinit"
+                    if len(cmd) > 1 and cmd[1] in {"abinit", "abinit_het", "abinit_homo"}
+                    else (cmd[1] if len(cmd) > 1 else "command")
+                ),
+                "argv": cmd,
+            }
+            for cmd in commands
+        ],
         "stdout_log": str(run_path / "stdout.log"),
         "stderr_log": str(run_path / "stderr.log"),
     }

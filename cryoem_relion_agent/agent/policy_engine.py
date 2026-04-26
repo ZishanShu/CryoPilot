@@ -278,6 +278,225 @@ class PolicyEngine:
             )
         return None
 
+    @staticmethod
+    def _extract_latest_picking_qc(state: SampleState) -> Optional[Dict[str, Any]]:
+        """Return picking_qc dict from last_execution, or None if absent."""
+        le = getattr(state, "last_execution", None)
+        if le is None:
+            return None
+        if not isinstance(le, dict):
+            try:
+                le = vars(le)
+            except TypeError:
+                return None
+        qc = le.get("picking_qc")
+        if isinstance(qc, dict):
+            return qc
+        md = le.get("metadata")
+        if isinstance(md, dict):
+            qc = md.get("picking_qc")
+            if isinstance(qc, dict):
+                return qc
+        return None
+
+    @staticmethod
+    def _last_execution_dict(state: SampleState) -> Optional[Dict[str, Any]]:
+        le = getattr(state, "last_execution", None)
+        if isinstance(le, dict):
+            return le
+        if le is None:
+            return None
+        try:
+            return vars(le)
+        except TypeError:
+            return None
+
+    @staticmethod
+    def _last_execution_picking_backend(le: Dict[str, Any]) -> str:
+        for key in ("picking_backend",):
+            v = le.get(key)
+            if isinstance(v, str) and v.strip():
+                return v.strip().lower()
+        md = le.get("metadata")
+        if isinstance(md, dict):
+            v = md.get("picking_backend")
+            if isinstance(v, str) and v.strip():
+                return v.strip().lower()
+        params = le.get("parameters")
+        if isinstance(params, dict):
+            v = params.get("picking_backend")
+            if isinstance(v, str) and v.strip():
+                return v.strip().lower()
+        return ""
+
+    @staticmethod
+    def _gate_params_from_le(le: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Build gate action parameters from a persisted last_execution dict.
+
+        Works for both the original Topaz execution result (via picking_qc) and
+        the persisted gate execution result (via direct fields + metadata).
+        Returns None if the evidence for failed_qc is absent. The returned dict
+        always includes a ``picking_qc`` sub-dict with the full payload (when
+        available), in addition to flattened fields for direct report access.
+        """
+        md: Dict[str, Any] = le.get("metadata") if isinstance(le.get("metadata"), dict) else {}
+
+        def _f(key: str):
+            v = le.get(key)
+            return v if v is not None else md.get(key)
+
+        qc_status = str(_f("picking_qc_status") or "").strip()
+        branch = str(_f("branch_name") or "").strip()
+        if qc_status == "failed_qc" and branch == "picking_qc":
+            # Persisted gate result — recover directly stored fields and a
+            # nested picking_qc dict (preserved by Scheduler when available).
+            flags = list(_f("picking_qc_flags") or [])
+            rec = str(_f("recommended_next_action") or "manual_review")
+            backend = str(_f("picking_backend") or "topaz")
+            nested_pq = le.get("picking_qc")
+            if not isinstance(nested_pq, dict) and isinstance(md, dict):
+                nested_pq = md.get("picking_qc")
+            if not isinstance(nested_pq, dict):
+                nested_pq = None
+            ge = nested_pq.get("ground_truth_evaluation") if isinstance(nested_pq, dict) else None
+            if not isinstance(ge, dict):
+                ge = {}
+            params: Dict[str, Any] = {
+                "branch_name": "picking_qc",
+                "picking_backend": backend,
+                "picking_qc_status": "failed_qc",
+                "picking_qc_flags": flags,
+                "recommended_next_action": rec,
+                "n_picks": (nested_pq.get("n_picks") if isinstance(nested_pq, dict) else None) or _f("n_picks"),
+                "n_micrographs_with_picks": (
+                    nested_pq.get("n_micrographs_with_picks") if isinstance(nested_pq, dict) else None
+                ),
+                "n_micrographs_total": (
+                    nested_pq.get("n_micrographs_total") if isinstance(nested_pq, dict) else None
+                ) or _f("n_micrographs_total"),
+                "zero_pick_micrograph_ratio": (
+                    nested_pq.get("zero_pick_micrograph_ratio") if isinstance(nested_pq, dict) else None
+                ) or _f("zero_pick_micrograph_ratio"),
+                "mean_picks_per_micrograph": (
+                    nested_pq.get("mean_picks_per_micrograph") if isinstance(nested_pq, dict) else None
+                ),
+                "median_picks_per_micrograph": (
+                    nested_pq.get("median_picks_per_micrograph") if isinstance(nested_pq, dict) else None
+                ),
+                "matching_tolerance_px": (
+                    ge.get("matching_tolerance_px")
+                    or (nested_pq.get("matching_tolerance_px") if isinstance(nested_pq, dict) else None)
+                ),
+                "coordinate_scale": (
+                    nested_pq.get("coordinate_scale") if isinstance(nested_pq, dict) else None
+                ),
+                "precision": ge.get("precision") if ge else _f("precision"),
+                "recall": ge.get("recall") if ge else _f("recall"),
+                "f1": ge.get("f1") if ge else _f("f1"),
+            }
+            if isinstance(nested_pq, dict):
+                params["picking_qc"] = dict(nested_pq)
+            return params
+
+        # Original Topaz execution result — look for picking_qc dict.
+        picking_qc: Optional[Dict[str, Any]] = le.get("picking_qc")
+        if not isinstance(picking_qc, dict) and isinstance(md, dict):
+            picking_qc = md.get("picking_qc")
+        if not isinstance(picking_qc, dict):
+            return None
+        if picking_qc.get("qc_status") != "failed_qc":
+            return None
+        flags = list(picking_qc.get("qc_flags") or [])
+        rec = str(picking_qc.get("recommended_next_action") or "manual_review")
+        backend = str(_f("picking_backend") or "topaz")
+        ge = picking_qc.get("ground_truth_evaluation") or {}
+        return {
+            "branch_name": "picking_qc",
+            "picking_backend": backend,
+            "picking_qc_status": "failed_qc",
+            "picking_qc_flags": flags,
+            "recommended_next_action": rec,
+            "n_picks": picking_qc.get("n_picks"),
+            "n_micrographs_with_picks": picking_qc.get("n_micrographs_with_picks"),
+            "n_micrographs_total": picking_qc.get("n_micrographs_total"),
+            "zero_pick_micrograph_ratio": picking_qc.get("zero_pick_micrograph_ratio"),
+            "mean_picks_per_micrograph": picking_qc.get("mean_picks_per_micrograph"),
+            "median_picks_per_micrograph": picking_qc.get("median_picks_per_micrograph"),
+            "matching_tolerance_px": (
+                ge.get("matching_tolerance_px") or picking_qc.get("matching_tolerance_px")
+            ),
+            "coordinate_scale": picking_qc.get("coordinate_scale"),
+            "precision": ge.get("precision"),
+            "recall": ge.get("recall"),
+            "f1": ge.get("f1"),
+            "picking_qc": dict(picking_qc),
+        }
+
+    def _build_picking_qc_gate_action(
+        self,
+        state: SampleState,
+        priorities: Dict[str, int],
+    ) -> Optional[Action]:
+        """Return the gate action when Topaz picking_qc indicates failed_qc.
+
+        The gate is idempotent: it fires from:
+        - Case A: last_execution is run_autopick (Topaz) with picking_qc.qc_status == failed_qc
+        - Case B: last_execution is already a picking_qc gate result (request_human_review
+          with branch_name=picking_qc and picking_qc_status=failed_qc), which happens after
+          a dry-run has overwritten the original Topaz last_execution.
+
+        Returns ``None`` when evidence is absent or contradicts the gate condition.
+        """
+        le = self._last_execution_dict(state)
+        if not le:
+            return None
+        action_name = str(le.get("action_name") or "").strip().lower()
+        md: Dict[str, Any] = le.get("metadata") if isinstance(le.get("metadata"), dict) else {}
+
+        # Case B — idempotent re-fire from a persisted gate execution result.
+        if action_name == "request_human_review":
+            branch = str(le.get("branch_name") or md.get("branch_name") or "").strip()
+            qc_status = str(le.get("picking_qc_status") or md.get("picking_qc_status") or "").strip()
+            if branch == "picking_qc" and qc_status == "failed_qc":
+                gp = self._gate_params_from_le(le)
+                if gp is not None:
+                    flags = gp["picking_qc_flags"]
+                    rec = gp["recommended_next_action"]
+                    reason_flags = ", ".join(flags) if flags else "unknown"
+                    return Action(
+                        name=ActionName.REQUEST_HUMAN_REVIEW,
+                        reason=(
+                            f"Picking QC failed after Topaz: {reason_flags}. "
+                            f"Recommended recovery: {rec}."
+                        ),
+                        parameters=gp,
+                        priority=priorities.get("request_human_review", 95),
+                    )
+            # A different human_review action (e.g. heterogeneity) — do not trigger gate.
+            return None
+
+        # Case A — primary: last_execution is a Topaz run_autopick.
+        if action_name and action_name != "run_autopick":
+            return None
+        backend = self._last_execution_picking_backend(le)
+        if backend and backend != "topaz":
+            return None
+        gp = self._gate_params_from_le(le)
+        if gp is None:
+            return None
+        flags = gp["picking_qc_flags"]
+        rec = gp["recommended_next_action"]
+        reason_flags = ", ".join(flags) if flags else "unknown"
+        return Action(
+            name=ActionName.REQUEST_HUMAN_REVIEW,
+            reason=(
+                f"Picking QC failed after Topaz: {reason_flags}. "
+                f"Recommended recovery: {rec}."
+            ),
+            parameters=gp,
+            priority=priorities.get("request_human_review", 95),
+        )
+
     def decide_extract_stage(self, state: SampleState, qc: QCMetrics) -> Optional[Action]:
         priorities = self.rules["priorities"]
         if self._is_stage_at_least(state, "AutoPick") and not self._is_stage_at_least(state, "Extract"):
@@ -383,6 +602,13 @@ class PolicyEngine:
                 parameters={"project_path": state.project_path},
                 priority=priorities["run_import_preprocess"],
             ))
+
+        # Picking QC gate: runs before any picking/extract decision so that a
+        # filesystem scan still showing CtfFind cannot push us back to run_autopick
+        # after a Topaz run has already produced failed_qc.
+        gate_action = self._build_picking_qc_gate_action(state, priorities)
+        if gate_action is not None:
+            return ret(gate_action)
 
         upstream_picking = self.decide_picking_stage(
             state,

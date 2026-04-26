@@ -69,6 +69,10 @@ class PipelineReport(BaseModel):
         default=None,
         description="Structured Topaz / picking preflight (availability, executable_path, blocked_reason, ...).",
     )
+    picking_qc: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Structured picking QC gate result (qc_status, n_picks, qc_flags, ground_truth_evaluation, ...).",
+    )
     heterogeneity_preflight: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Structured cryoDRGN heterogeneity preflight (availability, execution_mode, blocked_reason, ...).",
@@ -111,6 +115,22 @@ class PipelineReport(BaseModel):
         lines.append(f"- Next action: {self.next_action.name.value if self.next_action else 'N/A'}")
         if self.next_action:
             lines.append(f"- Next action reason: {self.next_action.reason}")
+        if (
+            self.next_action
+            and self.next_action.name.value == "request_human_review"
+            and isinstance(self.next_action.parameters, dict)
+            and self.next_action.parameters.get("branch_name") == "picking_qc"
+        ):
+            params = self.next_action.parameters
+            lines.append("")
+            lines.append("## Picking QC Gate")
+            lines.append(f"- Status: {params.get('picking_qc_status', 'N/A')}")
+            flags = params.get("picking_qc_flags") or []
+            if flags:
+                lines.append(f"- Flags: {', '.join(str(f) for f in flags)}")
+            lines.append(f"- Recommendation: {params.get('recommended_next_action', 'N/A')}")
+            if params.get("f1") is not None:
+                lines.append(f"- F1: {params.get('f1')}")
         if self.extra.get("picking_backend"):
             lines.append(f"- Picking backend: {self.extra.get('picking_backend')}")
         if self.extra.get("picking_selection_reason"):
@@ -222,6 +242,41 @@ class PipelineReport(BaseModel):
                 lines.append(f"- AF3 dir: {self.extra.get('mica_af3_dir')}")
             if self.extra.get("mica_output"):
                 lines.append(f"- Output path: {self.extra.get('mica_output')}")
+        if self.picking_qc:
+            qc = self.picking_qc
+            lines.append("")
+            lines.append("## Picking QC")
+            lines.append(f"- Backend: {self.extra.get('picking_backend') or 'N/A'}")
+            lines.append(f"- QC status: {qc.get('qc_status') or 'N/A'}")
+            lines.append(f"- Picks: {qc.get('n_picks')}")
+            n_with = qc.get("n_micrographs_with_picks")
+            n_total = qc.get("n_micrographs_total")
+            with_str = "N/A" if n_with is None else str(n_with)
+            if n_total is not None:
+                lines.append(f"- Micrographs with picks: {with_str} / {n_total}")
+            elif n_with is not None:
+                lines.append(f"- Micrographs with picks: {with_str}")
+            mp = qc.get("mean_picks_per_micrograph")
+            if mp is not None:
+                lines.append(f"- Mean picks/micrograph: {mp}")
+            if qc.get("zero_pick_micrograph_ratio") is not None:
+                lines.append(f"- Zero-pick micrograph ratio: {qc.get('zero_pick_micrograph_ratio')}")
+            ge = qc.get("ground_truth_evaluation") or {}
+            if ge:
+                tol = ge.get("matching_tolerance_px")
+                if tol is None:
+                    tol = qc.get("matching_tolerance_px")
+                tol_str = "N/A" if tol is None else f"{tol}px"
+                lines.append(
+                    f"- GT match: precision={ge.get('precision')} recall={ge.get('recall')} f1={ge.get('f1')}"
+                    f" tol={tol_str}"
+                )
+            flags = qc.get("qc_flags") or []
+            if flags:
+                lines.append(f"- Flags: {', '.join(flags)}")
+            rec = qc.get("recommended_next_action")
+            if rec:
+                lines.append(f"- Recommendation: {rec}")
         lines.append("")
         lines.append("## Backend Capabilities")
         lines.append(f"- Backend entries: {len(self.capability_matrix)}")
