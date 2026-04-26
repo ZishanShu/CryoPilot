@@ -231,10 +231,10 @@ def run_picking_benchmark(
         "--dry-run",
         help="Dry-run each case without executing subprocesses.",
     ),
-    threshold_sweep: Optional[str] = typer.Option(
-        None,
-        "--threshold-sweep",
-        help="Comma-separated Topaz thresholds to sweep, e.g. '-8,-7,-6,-5,-4'. Overrides topaz_thresholds in cases JSON.",
+    threshold_sweep: bool = typer.Option(
+        False,
+        "--threshold-sweep/--no-threshold-sweep",
+        help="Expand cases by topaz_thresholds.",
     ),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
@@ -249,18 +249,10 @@ def run_picking_benchmark(
 
     cases = load_cases_from_json(cases_json)
     if threshold_sweep:
-        sweep_thresholds = [float(t.strip()) for t in threshold_sweep.split(",") if t.strip()]
-        if sweep_thresholds:
-            for c in cases:
-                if c.picking_backend == "topaz":
-                    c.topaz_thresholds = sweep_thresholds
-
-    expanded: list = []
-    for c in cases:
-        expanded.extend(expand_threshold_sweep(c))
+        cases = [expanded for case in cases for expanded in expand_threshold_sweep(case)]
 
     runner = PickingBenchmarkRunner()
-    summary = runner.run_cases(expanded, dry_run=dry_run)
+    summary = runner.run_cases(cases, dry_run=dry_run)
     paths = write_outputs(summary, out_dir)
     typer.echo(
         json.dumps(

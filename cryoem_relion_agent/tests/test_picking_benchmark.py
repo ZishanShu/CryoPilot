@@ -383,5 +383,182 @@ class TestPickingBenchmarkOutputs(unittest.TestCase):
             self.assertTrue(out_dir.is_dir())
 
 
+# ---------------------------------------------------------------------------
+# CLI: run-picking-benchmark --threshold-sweep
+# ---------------------------------------------------------------------------
+
+
+class TestRunPickingBenchmarkCLI(unittest.TestCase):
+    """The CLI flag --threshold-sweep is a boolean (no argument required)."""
+
+    def _write_cases(self, path: Path, cases: list) -> None:
+        path.write_text(json.dumps({"cases": cases}), encoding="utf-8")
+
+    def test_threshold_sweep_flag_is_boolean_in_help(self) -> None:
+        from typer.testing import CliRunner
+        from app.main import app
+
+        runner = CliRunner()
+        res = runner.invoke(app, ["run-picking-benchmark", "--help"])
+        self.assertEqual(res.exit_code, 0, msg=res.output)
+        # Boolean flag: pair with --no-threshold-sweep, no value placeholder.
+        self.assertIn("--threshold-sweep", res.output)
+        self.assertIn("--no-threshold-sweep", res.output)
+
+    def test_threshold_sweep_does_not_require_argument(self) -> None:
+        """--threshold-sweep must be usable as a bare flag with no value."""
+        from typer.testing import CliRunner
+        from unittest.mock import patch
+
+        from app.main import app
+        from agent.picking_benchmark import PickingBenchmarkCaseResult
+
+        def _fake_run_case(self, case, *, dry_run: bool = False):
+            return PickingBenchmarkCaseResult(
+                case_id=case.case_id,
+                dataset_id=case.dataset_id,
+                backend=case.picking_backend,
+                threshold=case.topaz_threshold,
+                status="dry_run",
+            )
+
+        with TemporaryDirectory() as tmp:
+            cases_json = Path(tmp) / "cases.json"
+            self._write_cases(cases_json, [
+                {
+                    "case_id": "smoke",
+                    "dataset_id": "ds1",
+                    "project_path": tmp,
+                    "picking_backend": "topaz",
+                    "topaz_thresholds": [-6, -5, -4],
+                }
+            ])
+            out_dir = Path(tmp) / "out"
+            cli_runner = CliRunner()
+            with patch(
+                "agent.picking_benchmark.PickingBenchmarkRunner.run_case",
+                _fake_run_case,
+            ):
+                res = cli_runner.invoke(
+                    app,
+                    [
+                        "run-picking-benchmark",
+                        "--cases-json", str(cases_json),
+                        "--out-dir", str(out_dir),
+                        "--dry-run",
+                        "--threshold-sweep",
+                    ],
+                )
+            self.assertEqual(res.exit_code, 0, msg=res.output)
+            payload = json.loads(res.output)
+            self.assertEqual(payload["case_count"], 3)
+
+    def test_threshold_sweep_expands_three_thresholds_to_three_cases(self) -> None:
+        from typer.testing import CliRunner
+        from unittest.mock import patch
+
+        from app.main import app
+        from agent.picking_benchmark import PickingBenchmarkCaseResult
+
+        observed_case_ids: list = []
+
+        def _fake_run_case(self, case, *, dry_run: bool = False):
+            observed_case_ids.append(case.case_id)
+            return PickingBenchmarkCaseResult(
+                case_id=case.case_id,
+                dataset_id=case.dataset_id,
+                backend=case.picking_backend,
+                threshold=case.topaz_threshold,
+                status="dry_run",
+            )
+
+        with TemporaryDirectory() as tmp:
+            cases_json = Path(tmp) / "cases.json"
+            self._write_cases(cases_json, [
+                {
+                    "case_id": "smoke",
+                    "dataset_id": "ds1",
+                    "project_path": tmp,
+                    "picking_backend": "topaz",
+                    "topaz_thresholds": [-6, -5, -4],
+                }
+            ])
+            out_dir = Path(tmp) / "out"
+            cli_runner = CliRunner()
+            with patch(
+                "agent.picking_benchmark.PickingBenchmarkRunner.run_case",
+                _fake_run_case,
+            ):
+                res = cli_runner.invoke(
+                    app,
+                    [
+                        "run-picking-benchmark",
+                        "--cases-json", str(cases_json),
+                        "--out-dir", str(out_dir),
+                        "--dry-run",
+                        "--threshold-sweep",
+                    ],
+                )
+            self.assertEqual(res.exit_code, 0, msg=res.output)
+            self.assertEqual(len(observed_case_ids), 3)
+            self.assertEqual(len(set(observed_case_ids)), 3)
+            for cid in observed_case_ids:
+                self.assertTrue(cid.startswith("smoke_thresh_"), msg=cid)
+
+            csv_path = out_dir / "benchmark_summary.csv"
+            self.assertTrue(csv_path.is_file())
+            with open(csv_path, encoding="utf-8") as f:
+                rows = list(csv.DictReader(f))
+            self.assertEqual(len(rows), 3, msg="CSV should contain 3 data rows")
+
+    def test_no_threshold_sweep_does_not_expand(self) -> None:
+        """Without --threshold-sweep, a single case stays a single case
+        even if topaz_thresholds is present in the JSON."""
+        from typer.testing import CliRunner
+        from unittest.mock import patch
+
+        from app.main import app
+        from agent.picking_benchmark import PickingBenchmarkCaseResult
+
+        def _fake_run_case(self, case, *, dry_run: bool = False):
+            return PickingBenchmarkCaseResult(
+                case_id=case.case_id,
+                dataset_id=case.dataset_id,
+                backend=case.picking_backend,
+                threshold=case.topaz_threshold,
+                status="dry_run",
+            )
+
+        with TemporaryDirectory() as tmp:
+            cases_json = Path(tmp) / "cases.json"
+            self._write_cases(cases_json, [
+                {
+                    "case_id": "single",
+                    "dataset_id": "ds1",
+                    "project_path": tmp,
+                    "picking_backend": "topaz",
+                    "topaz_thresholds": [-6, -5, -4],
+                }
+            ])
+            out_dir = Path(tmp) / "out"
+            cli_runner = CliRunner()
+            with patch(
+                "agent.picking_benchmark.PickingBenchmarkRunner.run_case",
+                _fake_run_case,
+            ):
+                res = cli_runner.invoke(
+                    app,
+                    [
+                        "run-picking-benchmark",
+                        "--cases-json", str(cases_json),
+                        "--out-dir", str(out_dir),
+                        "--dry-run",
+                    ],
+                )
+            self.assertEqual(res.exit_code, 0, msg=res.output)
+            payload = json.loads(res.output)
+            self.assertEqual(payload["case_count"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()
