@@ -536,7 +536,9 @@ class Scheduler:
         )
         if not records:
             return None
-        selected = next((r for r in records if r.get("downstream_action")), records[0])
+        # Candidate-map routing v1 ranks records by QC score; select the top-ranked
+        # candidate by default rather than falling back to source-order index 0.
+        selected = records[0]
         action_name = selected.get("downstream_action") or "run_validation"
         try:
             name = ActionName(str(action_name))
@@ -607,6 +609,10 @@ class Scheduler:
             "candidate_map_routing_record",
             "candidate_map_routing_records",
             "candidate_map_count",
+            "selected_candidate_index",
+            "selected_candidate_qc_score",
+            "candidate_map_selection_reason",
+            "ranked_candidate_maps",
         )
         for key in preserve_keys:
             if key in payload and payload.get(key) not in (None, "", [], {}):
