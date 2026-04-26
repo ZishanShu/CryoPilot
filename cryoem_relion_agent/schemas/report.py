@@ -198,6 +198,17 @@ class PipelineReport(BaseModel):
                 lines.append(f"- {label}: {self.extra.get(key)}")
         if self.extra.get("recommended_downstream_action"):
             lines.append(f"- Recommended downstream action: {self.extra.get('recommended_downstream_action')}")
+        if self.extra.get("cryodrgn_ai_sampled_volume_count"):
+            lines.append("")
+            lines.append("## cryodrgn_ai Sampled Maps")
+            lines.append(f"- Sampled volumes: {self.extra.get('cryodrgn_ai_sampled_volume_count', '0')}")
+            lines.append(f"- Candidate maps: {self.extra.get('cryodrgn_ai_candidate_map_count', '0')}")
+            paths_raw = self.extra.get("cryodrgn_ai_sampled_volume_paths", "")
+            if paths_raw:
+                for p in paths_raw.split("|")[:3]:
+                    lines.append(f"  - {p}")
+            if self.extra.get("cryodrgn_ai_recommended_downstream"):
+                lines.append(f"- Recommended downstream: {self.extra.get('cryodrgn_ai_recommended_downstream')}")
         if self.extra.get("model_building_backend"):
             lines.append(f"- Model-building backend: {self.extra.get('model_building_backend')}")
         if self.extra.get("model_selection_reason"):

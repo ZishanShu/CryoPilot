@@ -448,6 +448,12 @@ class Scheduler:
             "require_gpu",
             "output_dir",
             "run_dir",
+            # sampled-volume generation
+            "sample_volumes",
+            "n_sampled_volumes",
+            "eval_vol_apix",
+            "eval_vol_box_size",
+            "eval_vol_device",
         ):
             if key in ctx and ctx[key] not in (None, ""):
                 params[key] = ctx[key]
