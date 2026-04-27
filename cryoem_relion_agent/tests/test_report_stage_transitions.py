@@ -98,6 +98,8 @@ class TestReportStageTransitions(unittest.TestCase):
         self.assertIn("modelangelo", md)
         self.assertIn("## Candidate Map QC Ranking", md)
         self.assertIn("Selected candidate index", md)
+        self.assertIn("## Candidate Map Batch Model-Building Plan", md)
+        self.assertIn("Top-K count", md)
 
 
 if __name__ == "__main__":
