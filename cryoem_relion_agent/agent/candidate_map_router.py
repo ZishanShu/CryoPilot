@@ -146,6 +146,7 @@ def create_candidate_map_routing_records(
         ranked_candidate_maps.append(
             {
                 "candidate_index": candidate_index,
+                "project_path": project_path or None,
                 "map_path": candidate.get("map_path"),
                 "source_backend": candidate.get("source_backend"),
                 "source_run_dir": candidate.get("source_run_dir"),
@@ -162,6 +163,7 @@ def create_candidate_map_routing_records(
         exists = bool(map_path and map_path.is_file())
         record: Dict[str, Any] = {
             "candidate_index": candidate_index,
+            "project_path": project_path or None,
             "source_backend": candidate.get("source_backend"),
             "source_run_dir": candidate.get("source_run_dir"),
             "map_path": str(map_path) if map_path else None,

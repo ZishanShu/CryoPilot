@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 from pathlib import Path
@@ -460,6 +461,9 @@ class Reporter:
                 candidate_map_routing = [x for x in raw_records if isinstance(x, dict)]
         if not candidate_map_routing:
             candidate_map_routing = create_candidate_map_routing_records(state, max_candidates=5)
+        batch_plans: List[Dict[str, Any]] = []
+        batch_count: Optional[int] = None
+        batch_top_k: Optional[int] = None
         ranked_candidate_maps: List[Dict[str, Any]] = []
         selected_candidate_index: Optional[int] = None
         selected_candidate_qc_score: Optional[float] = None
@@ -467,6 +471,19 @@ class Reporter:
         selected_candidate_backend: Optional[str] = None
         selected_candidate_action: Optional[str] = None
         if next_action and isinstance(next_action.parameters, dict):
+            batch_raw = next_action.parameters.get("candidate_map_batch_model_building_plans")
+            if isinstance(batch_raw, list):
+                batch_plans = [x for x in batch_raw if isinstance(x, dict)]
+            if next_action.parameters.get("candidate_map_batch_count") is not None:
+                try:
+                    batch_count = int(next_action.parameters.get("candidate_map_batch_count"))
+                except (TypeError, ValueError):
+                    batch_count = None
+            if next_action.parameters.get("candidate_map_batch_top_k") is not None:
+                try:
+                    batch_top_k = int(next_action.parameters.get("candidate_map_batch_top_k"))
+                except (TypeError, ValueError):
+                    batch_top_k = None
             ranked_raw = next_action.parameters.get("ranked_candidate_maps")
             if isinstance(ranked_raw, list):
                 ranked_candidate_maps = [x for x in ranked_raw if isinstance(x, dict)]
@@ -554,6 +571,46 @@ class Reporter:
                 selected_candidate_action = str(
                     selected_record.get("downstream_action") or selected_record.get("recommended_action")
                 )
+        if not batch_plans and selected_record is not None:
+            row_batch = selected_record.get("candidate_map_batch_model_building_plans")
+            if isinstance(row_batch, list):
+                batch_plans = [x for x in row_batch if isinstance(x, dict)]
+            if batch_count is None:
+                raw_count = selected_record.get("candidate_map_batch_count")
+                if raw_count is not None:
+                    try:
+                        batch_count = int(raw_count)
+                    except (TypeError, ValueError):
+                        batch_count = None
+            if batch_top_k is None:
+                raw_top_k = selected_record.get("candidate_map_batch_top_k")
+                if raw_top_k is not None:
+                    try:
+                        batch_top_k = int(raw_top_k)
+                    except (TypeError, ValueError):
+                        batch_top_k = None
+        if not batch_plans and state.last_execution and isinstance(state.last_execution, dict):
+            le_batch = state.last_execution.get("candidate_map_batch_model_building_plans")
+            if isinstance(le_batch, list):
+                batch_plans = [x for x in le_batch if isinstance(x, dict)]
+            if batch_count is None:
+                raw_count = state.last_execution.get("candidate_map_batch_count")
+                if raw_count is not None:
+                    try:
+                        batch_count = int(raw_count)
+                    except (TypeError, ValueError):
+                        batch_count = None
+            if batch_top_k is None:
+                raw_top_k = state.last_execution.get("candidate_map_batch_top_k")
+                if raw_top_k is not None:
+                    try:
+                        batch_top_k = int(raw_top_k)
+                    except (TypeError, ValueError):
+                        batch_top_k = None
+        if batch_count is None and batch_plans:
+            batch_count = len(batch_plans)
+        if batch_top_k is None and batch_plans:
+            batch_top_k = len(batch_plans)
         extra: Dict[str, str] = {}
         if picking_backend:
             extra["picking_backend"] = picking_backend
@@ -659,6 +716,10 @@ class Reporter:
             extra["selected_candidate_backend"] = selected_candidate_backend
         if selected_candidate_action:
             extra["selected_candidate_action"] = selected_candidate_action
+        if batch_count is not None:
+            extra["candidate_map_batch_count"] = str(batch_count)
+        if batch_top_k is not None:
+            extra["candidate_map_batch_top_k"] = str(batch_top_k)
 
         picking_qc: Optional[Dict[str, Any]] = None
         if state.last_execution:
@@ -708,6 +769,9 @@ class Reporter:
             candidate_map_selection_reason=candidate_map_selection_reason,
             selected_candidate_backend=selected_candidate_backend,
             selected_candidate_action=selected_candidate_action,
+            candidate_map_batch_model_building_plans=[copy.deepcopy(x) for x in batch_plans],
+            candidate_map_batch_count=batch_count,
+            candidate_map_batch_top_k=batch_top_k,
             capability_matrix=capability_matrix or {},
             backend_selection={
                 "picking": (next_action.parameters.get("picking_selection_decision") if next_action and isinstance(next_action.parameters, dict) else None),

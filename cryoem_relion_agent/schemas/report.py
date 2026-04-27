@@ -88,6 +88,9 @@ class PipelineReport(BaseModel):
     candidate_map_selection_reason: Optional[str] = None
     selected_candidate_backend: Optional[str] = None
     selected_candidate_action: Optional[str] = None
+    candidate_map_batch_model_building_plans: List[Dict[str, Any]] = Field(default_factory=list)
+    candidate_map_batch_count: Optional[int] = None
+    candidate_map_batch_top_k: Optional[int] = None
     capability_matrix: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     backend_selection: Dict[str, Optional[Dict[str, Any]]] = Field(default_factory=dict)
     benchmark_summary: Optional[Dict[str, Any]] = None
@@ -268,6 +271,34 @@ class PipelineReport(BaseModel):
                 lines.append(f"  - weights_path: {row.get('weights_path') or 'N/A'}")
         else:
             lines.append("- No ranked candidate maps available")
+        lines.append("")
+        lines.append("## Candidate Map Batch Model-Building Plan")
+        batch_count_display = (
+            self.candidate_map_batch_count
+            if self.candidate_map_batch_count is not None
+            else len(self.candidate_map_batch_model_building_plans)
+        )
+        lines.append(
+            f"- Top-K count: {self.candidate_map_batch_top_k if self.candidate_map_batch_top_k is not None else 'N/A'}"
+        )
+        lines.append(f"- Planned candidates: {batch_count_display}")
+        if self.candidate_map_batch_model_building_plans:
+            for row in self.candidate_map_batch_model_building_plans[:10]:
+                lines.append(f"- candidate {row.get('candidate_index')}:")
+                lines.append(f"  - qc_rank: {row.get('qc_rank')}")
+                lines.append(f"  - qc_score: {row.get('qc_score')}")
+                lines.append(f"  - qc_status: {row.get('qc_status') or 'N/A'}")
+                lines.append(f"  - map: {row.get('map_path') or row.get('candidate_map_path') or 'N/A'}")
+                lines.append(
+                    f"  - backend/action: {(row.get('selected_backend') or 'N/A')} / "
+                    f"{(row.get('selected_action') or 'N/A')}"
+                )
+                lines.append(f"  - output_dir: {row.get('output_dir') or 'N/A'}")
+                lines.append(f"  - dry-run command: {row.get('command') or 'N/A'}")
+                lines.append(f"  - latent_source: {row.get('latent_source') or 'N/A'}")
+                lines.append(f"  - weights_path: {row.get('weights_path') or 'N/A'}")
+        else:
+            lines.append("- No candidate batch model-building plans")
         if self.extra.get("model_building_backend"):
             lines.append(f"- Model-building backend: {self.extra.get('model_building_backend')}")
         if self.extra.get("model_selection_reason"):
