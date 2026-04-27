@@ -1,0 +1,27 @@
+# P1 picking-accuracy case: Topaz on EMPIAR-10017.
+# Paths under input/ are produced by:
+#   python -m scripts.prepare_empiar10017_picking_accuracy \
+#     --dataset-root <DATASET_ROOT> --run-root <RUN_ROOT> ...
+case_id: P1_topaz_empiar10017_picking_accuracy
+case_type: picking_accuracy
+dataset:
+  name: EMPIAR-10017
+  local_root: /root/share/szs/CryoAgent/data/empiar/EMPIAR-10017
+input:
+  split_manifest: /root/share/szs/CryoAgent/real_runs/P1_topaz_empiar10017_picking_accuracy/input/split_manifest.json
+  gt_coordinates: /root/share/szs/CryoAgent/real_runs/P1_topaz_empiar10017_picking_accuracy/input/gt_coordinates.tsv
+  micrographs_train_star: /root/share/szs/CryoAgent/real_runs/P1_topaz_empiar10017_picking_accuracy/input/micrographs_train.star
+  micrographs_dev_star: /root/share/szs/CryoAgent/real_runs/P1_topaz_empiar10017_picking_accuracy/input/micrographs_dev.star
+  micrographs_test_star: /root/share/szs/CryoAgent/real_runs/P1_topaz_empiar10017_picking_accuracy/input/micrographs_test.star
+evaluation:
+  type: coordinate_matching
+  matching_radius_px: 30
+  radius_sensitivity_px: [20, 30, 40]
+  eval_split: test
+metrics:
+  - precision
+  - recall
+  - f1
+  - n_gt
+  - n_pred
+  - n_matched
