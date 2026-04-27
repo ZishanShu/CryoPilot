@@ -732,6 +732,16 @@ class Reporter:
             if isinstance(qc_payload, dict):
                 picking_qc = qc_payload
 
+        llm_supervised_routing: Optional[Dict[str, Any]] = None
+        if next_action and isinstance(next_action.parameters, dict):
+            raw_llm = next_action.parameters.get("llm_supervised_result")
+            if isinstance(raw_llm, dict):
+                llm_supervised_routing = raw_llm
+        if llm_supervised_routing is None and isinstance(state.last_execution, dict):
+            raw_llm = state.last_execution.get("llm_supervised_result")
+            if isinstance(raw_llm, dict):
+                llm_supervised_routing = raw_llm
+
         return PipelineReport(
             state=state,
             qc=qc,
@@ -770,6 +780,7 @@ class Reporter:
                 "model_building": (next_action.parameters.get("model_building_selection_decision") if next_action and isinstance(next_action.parameters, dict) else None),
             },
             benchmark_summary=benchmark_summary,
+            llm_supervised_routing=llm_supervised_routing,
         )
 
     @staticmethod

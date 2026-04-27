@@ -671,11 +671,8 @@ def _build_candidate_maps(artifacts: Dict[str, Any], result: Dict[str, Any]) -> 
         return []
     run_dir = artifacts.get("run_dir", "")
     rep_z_path = artifacts.get("representative_z_path") or ""
-    weights_paths = [str(p) for p in (artifacts.get("model_weights") or [])]
-    weights_path = next(
-        (p for p in weights_paths if Path(str(p)).name == "weights.pkl"),
-        weights_paths[0] if weights_paths else "",
-    )
+    weights_paths = list(artifacts.get("model_weights") or [])
+    weights_path = weights_paths[0] if weights_paths else ""
     return [
         {
             "source_backend": BACKEND_NAME,

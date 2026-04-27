@@ -94,6 +94,13 @@ class PipelineReport(BaseModel):
     capability_matrix: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     backend_selection: Dict[str, Optional[Dict[str, Any]]] = Field(default_factory=dict)
     benchmark_summary: Optional[Dict[str, Any]] = None
+    llm_supervised_routing: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description=(
+            "LLM-supervised candidate-map routing decision (optional). Includes mode, "
+            "selected candidate, backend/action, fallback flags, and validation diagnostics."
+        ),
+    )
 
     def to_markdown(self) -> str:
         """Render a concise markdown report."""
@@ -266,13 +273,15 @@ class PipelineReport(BaseModel):
             lines.append("- No ranked candidate maps available")
         lines.append("")
         lines.append("## Candidate Map Batch Model-Building Plan")
-        batch_count = (
+        batch_count_display = (
             self.candidate_map_batch_count
             if self.candidate_map_batch_count is not None
             else len(self.candidate_map_batch_model_building_plans)
         )
-        lines.append(f"- Top-K count: {self.candidate_map_batch_top_k if self.candidate_map_batch_top_k is not None else 'N/A'}")
-        lines.append(f"- Planned candidates: {batch_count}")
+        lines.append(
+            f"- Top-K count: {self.candidate_map_batch_top_k if self.candidate_map_batch_top_k is not None else 'N/A'}"
+        )
+        lines.append(f"- Planned candidates: {batch_count_display}")
         if self.candidate_map_batch_model_building_plans:
             for row in self.candidate_map_batch_model_building_plans[:10]:
                 lines.append(f"- candidate {row.get('candidate_index')}:")
@@ -281,7 +290,8 @@ class PipelineReport(BaseModel):
                 lines.append(f"  - qc_status: {row.get('qc_status') or 'N/A'}")
                 lines.append(f"  - map: {row.get('map_path') or row.get('candidate_map_path') or 'N/A'}")
                 lines.append(
-                    f"  - backend/action: {(row.get('selected_backend') or 'N/A')} / {(row.get('selected_action') or 'N/A')}"
+                    f"  - backend/action: {(row.get('selected_backend') or 'N/A')} / "
+                    f"{(row.get('selected_action') or 'N/A')}"
                 )
                 lines.append(f"  - output_dir: {row.get('output_dir') or 'N/A'}")
                 lines.append(f"  - dry-run command: {row.get('command') or 'N/A'}")
@@ -333,6 +343,62 @@ class PipelineReport(BaseModel):
                 lines.append(f"- AF3 dir: {self.extra.get('mica_af3_dir')}")
             if self.extra.get("mica_output"):
                 lines.append(f"- Output path: {self.extra.get('mica_output')}")
+        if self.llm_supervised_routing:
+            lr = self.llm_supervised_routing
+            lines.append("")
+            lines.append("## LLM-Supervised Routing")
+            lines.append(f"- Mode: {lr.get('mode') or 'N/A'}")
+            sel_idx = lr.get("selected_candidate_index")
+            lines.append(
+                f"- Selected candidate index: {sel_idx if sel_idx is not None else 'N/A'}"
+            )
+            lines.append(f"- Selected backend: {lr.get('selected_backend') or 'N/A'}")
+            lines.append(f"- Selected action: {lr.get('selected_action') or 'N/A'}")
+            decision = lr.get("decision") or {}
+            confidence = decision.get("confidence") if isinstance(decision, dict) else None
+            lines.append(
+                f"- Confidence: {confidence if confidence is not None else 'N/A'}"
+            )
+            lines.append(f"- Fallback used: {bool(lr.get('fallback_used'))}")
+            if lr.get("fallback_reason"):
+                lines.append(f"- Fallback reason: {lr.get('fallback_reason')}")
+            lines.append(
+                f"- Decision reason: {lr.get('decision_reason') or 'N/A'}"
+            )
+            risk_flags = lr.get("risk_flags") or []
+            if risk_flags:
+                lines.append(f"- Risk flags: {', '.join(str(f) for f in risk_flags)}")
+            else:
+                lines.append("- Risk flags: none")
+            validation = lr.get("validation") if isinstance(lr.get("validation"), dict) else {}
+            v_errors = validation.get("errors") or []
+            v_warnings = validation.get("warnings") or []
+            if v_errors:
+                lines.append(f"- Validation errors: {'; '.join(str(e) for e in v_errors)}")
+            else:
+                lines.append("- Validation errors: none")
+            if v_warnings:
+                lines.append(
+                    f"- Validation warnings: {'; '.join(str(w) for w in v_warnings)}"
+                )
+            else:
+                lines.append("- Validation warnings: none")
+            obs = lr.get("observation") if isinstance(lr.get("observation"), dict) else {}
+            rb_idx = obs.get("selected_candidate_index")
+            rb_backend = obs.get("rule_based_selected_backend")
+            rb_action = obs.get("rule_based_selected_action")
+            lines.append(
+                f"- Rule-based selected candidate: index={rb_idx if rb_idx is not None else 'N/A'} "
+                f"backend={rb_backend or 'N/A'} action={rb_action or 'N/A'}"
+            )
+            agrees = (
+                rb_idx is not None
+                and sel_idx is not None
+                and int(rb_idx) == int(sel_idx)
+                and (rb_backend or "").lower() == str(lr.get("selected_backend") or "").lower()
+            )
+            lines.append(f"- LLM agrees with rule-based selection: {bool(agrees)}")
+
         if self.picking_qc:
             qc = self.picking_qc
             lines.append("")
