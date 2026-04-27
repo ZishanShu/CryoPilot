@@ -10,3 +10,31 @@ cases.db
 *.sqlite3
 reports/
 tmp/
+
+# CryoAgent local data / heavy artifacts
+data/
+real_runs/
+.cryoem_agent/
+outputs/
+runs/
+logs/
+
+# cryo-EM heavy files
+*.mrc
+*.mrcs
+*.map
+*.map.gz
+*.star
+*.box
+*.coord
+*.cif
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# local env
+.env
+*.log
