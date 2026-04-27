@@ -64,13 +64,21 @@ def decide_next(
         "--sequence",
         help="Path to FASTA/sequence file; overrides persisted sequence for this run.",
     ),
+    agent_mode: str = typer.Option(
+        "rule_based",
+        "--agent-mode",
+        help="Decision agent mode: rule_based (default) | llm_supervised.",
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Decide next action from current project status."""
     setup_logging(verbose)
     validate_sequence_path(sequence)
     scheduler = Scheduler(project_root=project)
-    action = scheduler.decide_next(sequence_override=sequence)
+    action = scheduler.decide_next(
+        sequence_override=sequence,
+        agent_mode=str(agent_mode or "rule_based").strip().lower(),
+    )
     typer.echo(json.dumps(action.model_dump(mode="json"), indent=2))
 
 
@@ -132,6 +140,11 @@ def run_next(
         "--matching-tolerance-px",
         help="Tolerance for greedy GT matching, in pixels. Default 80.0.",
     ),
+    agent_mode: str = typer.Option(
+        "rule_based",
+        "--agent-mode",
+        help="Decision agent mode: rule_based (default) | llm_supervised.",
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Decide and run next action."""
@@ -162,6 +175,7 @@ def run_next(
         preferred_picking_backend=(str(picking_backend).strip() if picking_backend else None),
         picking_overrides=picking_overrides or None,
         picking_qc_params=picking_qc_params or None,
+        agent_mode=str(agent_mode or "rule_based").strip().lower(),
     )
     typer.echo(json.dumps({"action": action.model_dump(mode="json"), "execution": result}, indent=2))
 
@@ -203,6 +217,11 @@ def generate_report(
         "--refresh-state",
         help="Write scanned sample state to sample_state.json (default: read-only report).",
     ),
+    agent_mode: str = typer.Option(
+        "rule_based",
+        "--agent-mode",
+        help="Decision agent mode: rule_based (default) | llm_supervised.",
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Generate markdown/json report."""
@@ -214,6 +233,7 @@ def generate_report(
         out_md=out,
         sequence_override=sequence,
         refresh_state=refresh_state,
+        agent_mode=str(agent_mode or "rule_based").strip().lower(),
     )
     typer.echo(f"Report generated. stage={report.state.stage}, next_action={report.next_action.name.value if report.next_action else 'N/A'}")
 

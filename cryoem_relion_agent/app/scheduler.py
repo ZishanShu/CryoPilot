@@ -15,6 +15,7 @@ from agent.candidate_map_router import (
     create_candidate_map_routing_records,
     read_candidate_maps,
 )
+from agent.llm_supervisor import llm_supervised_route
 from agent.model_building_preflight import preflight_model_building
 from agent.heterogeneity_preflight import enrich_and_preflight_cryodrgn_params
 from agent.picking_preflight import enrich_and_preflight_topaz_params
@@ -655,6 +656,86 @@ class Scheduler:
         return payload, copy.deepcopy(candidate_maps)
 
 
+    def _apply_llm_supervision(self, state, candidate_action: Action) -> Action:
+        """Override the rule-based candidate-map action using LLM-supervised routing.
+
+        Falls through to the original action if LLM supervision can't produce a
+        usable selection.
+        """
+
+        try:
+            llm_result = llm_supervised_route(state, provider="mock")
+        except Exception as exc:  # pragma: no cover - defensive: never block scheduling
+            merged = dict(candidate_action.parameters)
+            merged["agent_mode"] = "llm_supervised"
+            merged["llm_supervised_error"] = str(exc)
+            return candidate_action.model_copy(update={"parameters": merged})
+
+        selected_idx = llm_result.get("selected_candidate_index")
+        selected_backend = str(llm_result.get("selected_backend") or "").strip().lower()
+        selected_action_name = str(llm_result.get("selected_action") or "").strip().lower()
+
+        records = candidate_action.parameters.get("candidate_map_routing_records") or []
+        target: Optional[Dict[str, Any]] = None
+        if selected_idx is not None and isinstance(records, list):
+            for r in records:
+                if not isinstance(r, dict):
+                    continue
+                try:
+                    if int(r.get("candidate_index", -1)) == int(selected_idx):
+                        target = r
+                        break
+                except (TypeError, ValueError):
+                    continue
+
+        merged = dict(candidate_action.parameters)
+        merged["llm_supervised_result"] = llm_result
+        merged["agent_mode"] = "llm_supervised"
+        merged["llm_selected_candidate_index"] = selected_idx
+        merged["llm_selected_backend"] = selected_backend or None
+        merged["llm_selected_action"] = selected_action_name or None
+        merged["llm_decision_reason"] = llm_result.get("decision_reason")
+        merged["llm_fallback_used"] = bool(llm_result.get("fallback_used"))
+
+        if (
+            target is not None
+            and selected_action_name in {"run_modelangelo", "run_emodelx", "run_mica"}
+        ):
+            try:
+                new_name = ActionName(selected_action_name)
+            except ValueError:
+                new_name = candidate_action.name
+            new_params = action_parameters_from_record(target)
+            for key in (
+                "candidate_map_routing_records",
+                "candidate_maps",
+                "upstream_candidate_maps",
+                "candidate_map_count",
+                "candidate_map_selected_count",
+                "ranked_candidate_maps",
+            ):
+                value = candidate_action.parameters.get(key)
+                if value is not None:
+                    new_params[key] = value
+            new_params["llm_supervised_result"] = llm_result
+            new_params["agent_mode"] = "llm_supervised"
+            new_params["llm_selected_candidate_index"] = selected_idx
+            new_params["llm_selected_backend"] = selected_backend
+            new_params["llm_selected_action"] = selected_action_name
+            new_params["llm_decision_reason"] = llm_result.get("decision_reason")
+            new_params["llm_fallback_used"] = bool(llm_result.get("fallback_used"))
+            return Action(
+                name=new_name,
+                reason=(
+                    f"LLM-supervised candidate map {selected_idx} -> "
+                    f"{selected_backend} ({llm_result.get('decision_reason')})"
+                ),
+                parameters=new_params,
+                priority=candidate_action.priority,
+            )
+
+        return candidate_action.model_copy(update={"parameters": merged})
+
     def _resolve_next_action(
         self,
         state,
@@ -663,6 +744,7 @@ class Scheduler:
         log_history: bool = True,
         preferred_picking_backend: Optional[str] = None,
         picking_overrides: Optional[Dict[str, Any]] = None,
+        agent_mode: str = "rule_based",
     ) -> Action:
         """Apply policy; if it delegates structure routing, call ``StructureRouter``."""
         candidate_action = self._maybe_candidate_map_model_building_action(
@@ -672,6 +754,8 @@ class Scheduler:
             preferred_picking_backend=preferred_picking_backend,
         )
         if candidate_action is not None:
+            if str(agent_mode or "rule_based").strip().lower() == "llm_supervised":
+                candidate_action = self._apply_llm_supervision(state, candidate_action)
             return candidate_action
 
         reconstruction_action = self._maybe_reconstruction_action(state, qc, modeling_context=modeling_context)
@@ -818,6 +902,7 @@ class Scheduler:
         modeling_context: Optional[ModelingContext] = None,
         preferred_picking_backend: Optional[str] = None,
         picking_overrides: Optional[Dict[str, Any]] = None,
+        agent_mode: str = "rule_based",
     ) -> Action:
         """Decide next pipeline action (including structure-tool routing when applicable)."""
         self._begin_run_trace()
@@ -828,6 +913,7 @@ class Scheduler:
             modeling_context=modeling_context,
             preferred_picking_backend=preferred_picking_backend,
             picking_overrides=picking_overrides,
+            agent_mode=agent_mode,
         )
         state.last_action = action.name.value
         self.state_manager.save_state(state)
@@ -841,6 +927,7 @@ class Scheduler:
         preferred_picking_backend: Optional[str] = None,
         picking_overrides: Optional[Dict[str, Any]] = None,
         picking_qc_params: Optional[Dict[str, Any]] = None,
+        agent_mode: str = "rule_based",
     ):
         """Decide and execute next action."""
         run_id = self._begin_run_trace()
@@ -851,6 +938,7 @@ class Scheduler:
             modeling_context=modeling_context,
             preferred_picking_backend=preferred_picking_backend,
             picking_overrides=picking_overrides,
+            agent_mode=agent_mode,
         )
         decision_entry_id = self.policy_engine.get_last_decision_entry_id()
         # PolicyEngine may have already persisted the decision entry directly.
@@ -1075,6 +1163,7 @@ class Scheduler:
         modeling_context: Optional[ModelingContext] = None,
         *,
         refresh_state: bool = False,
+        agent_mode: str = "rule_based",
     ) -> PipelineReport:
         """Generate report and optionally write JSON/Markdown files.
 
@@ -1085,7 +1174,13 @@ class Scheduler:
             sequence_override=sequence_override,
             persist_state=refresh_state,
         )
-        next_action = self._resolve_next_action(state, qc, modeling_context=modeling_context, log_history=False)
+        next_action = self._resolve_next_action(
+            state,
+            qc,
+            modeling_context=modeling_context,
+            log_history=False,
+            agent_mode=agent_mode,
+        )
         latest_bench = load_latest_benchmark(self.project_root)
         bench_summary = self._last_benchmark_summary
         if bench_summary is None and isinstance(latest_bench, dict):
