@@ -352,6 +352,7 @@ class Scheduler:
         *,
         backend_id: str,
         action_name: ActionName,
+        runtime_matrix: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Keep Stage 33B-lite selection reports consistent with the action we execute.
@@ -377,6 +378,18 @@ class Scheduler:
         aligned["fallback_applied"] = False
         aligned["rejected_backends"] = rejected
         aligned["rejection_reasons"] = reasons
+        if isinstance(runtime_matrix, dict):
+            for candidate, runtime in runtime_matrix.items():
+                if candidate == backend_id or not isinstance(runtime, dict):
+                    continue
+                if runtime.get("real_run_available") is False:
+                    if candidate not in aligned["rejected_backends"]:
+                        aligned["rejected_backends"].append(candidate)
+                    missing = ",".join(runtime.get("missing_dependencies") or runtime.get("missing_inputs") or [])
+                    aligned["rejection_reasons"].setdefault(
+                        candidate,
+                        str(runtime.get("blocked_reason") or f"real_run_unavailable:{missing}" or "real_run_unavailable"),
+                    )
         return aligned
 
     def _enrich_model_building_action(self, state, action: Action) -> Action:
@@ -407,6 +420,7 @@ class Scheduler:
             decision,
             backend_id=backend_id,
             action_name=action_name,
+            runtime_matrix=runtime_matrix,
         )
         decision["backend_runtime_matrix"] = runtime_matrix
         decision["dry_run"] = True
@@ -840,6 +854,7 @@ class Scheduler:
             decision,
             backend_id=mb_resolved,
             action_name=new_name,
+            runtime_matrix=runtime_matrix,
         )
         decision["backend_runtime_matrix"] = runtime_matrix
         decision.setdefault("dry_run", True)

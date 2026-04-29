@@ -208,23 +208,28 @@ def resolve_executable(
     """Resolve an executable from an explicit path/name, env var, or PATH."""
     attempts: List[Dict[str, Any]] = []
     candidates: List[Tuple[str, str]] = []
-    if executable and str(executable).strip():
-        candidates.append(("explicit", str(_expand_config_value(str(executable).strip()))))
-    if env_var and os.environ.get(env_var):
-        candidates.append((f"env:{env_var}", str(_expand_config_value(os.environ[env_var].strip()))))
-    for ev in env_vars:
-        if ev and os.environ.get(ev):
-            candidates.append((f"env:{ev}", str(_expand_config_value(os.environ[ev].strip()))))
-    for name in default_names:
-        if name and str(name).strip():
-            candidates.append(("path", str(name).strip()))
-    for d in candidate_dirs:
-        d_text = _stringify_path(_expand_config_value(d))
-        if not d_text:
-            continue
+    explicit = str(_expand_config_value(str(executable).strip())) if executable and str(executable).strip() else None
+    if explicit:
+        # Explicit action/config values are authoritative.  A stale or missing
+        # explicit path must block real-run instead of silently falling back to
+        # PATH, otherwise migrated-server bugs are hidden.
+        candidates.append(("explicit", explicit))
+    else:
+        if env_var and os.environ.get(env_var):
+            candidates.append((f"env:{env_var}", str(_expand_config_value(os.environ[env_var].strip()))))
+        for ev in env_vars:
+            if ev and os.environ.get(ev):
+                candidates.append((f"env:{ev}", str(_expand_config_value(os.environ[ev].strip()))))
         for name in default_names:
             if name and str(name).strip():
-                candidates.append(("candidate_dir", str(Path(d_text) / str(name).strip())))
+                candidates.append(("path", str(name).strip()))
+        for d in candidate_dirs:
+            d_text = _stringify_path(_expand_config_value(d))
+            if not d_text:
+                continue
+            for name in default_names:
+                if name and str(name).strip():
+                    candidates.append(("candidate_dir", str(Path(d_text) / str(name).strip())))
 
     seen_candidates: set[Tuple[str, str]] = set()
     for source, raw in candidates:
