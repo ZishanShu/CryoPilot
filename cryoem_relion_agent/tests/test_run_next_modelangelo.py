@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
 from agent.reporter import Reporter
-from relion.model_angelo_runner import run_model_angelo
+from relion.model_angelo_runner import _resolve_executable, run_model_angelo
 from relion.relion_actions import RelionActionExecutor
 from schemas.action import Action, ActionName
 from schemas.qc_metrics import QCMetrics
@@ -75,7 +75,7 @@ class TestModelAngeloCommandBuild(unittest.TestCase):
             with patch("relion.model_angelo_runner.subprocess.run") as mock_run:
                 out = run_model_angelo(action, root, state=None, dry_run=True, model_builders_yaml=cfg)
                 mock_run.assert_not_called()
-            self.assertEqual(out["return_code"], 0)
+            self.assertIsNone(out["return_code"])
             self.assertEqual(out["status"], "dry_run")
 
     def test_missing_sequence_path_error(self) -> None:
@@ -154,8 +154,46 @@ class TestModelAngeloCommandBuild(unittest.TestCase):
             )
             action = _make_action(str(m), str(f))
             out = run_model_angelo(action, root, state=None, dry_run=True, model_builders_yaml=cfg)
-            self.assertEqual(out["status"], "error_validation")
-            self.assertIn("executable not found", out.get("error_message") or "")
+            self.assertEqual(out["status"], "dry_run")
+            self.assertTrue(out["success"])
+            self.assertIsNone(out["return_code"])
+            self.assertTrue(out.get("warnings"))
+            self.assertIn("executable not found", " ".join(out.get("warnings") or []))
+
+    def test_modelangelo_resolve_executable_permission_error_no_traceback(self) -> None:
+        with patch("agent.backend_runtime.Path.exists", side_effect=PermissionError("denied")):
+            exe, err, diag = _resolve_executable("/root/anaconda3/envs/model_angelo/bin/model_angelo")
+
+        self.assertIn("/root/anaconda3", exe)
+        self.assertIsNotNone(err)
+        self.assertIn("not accessible", err or "")
+        access = diag.get("access") or {}
+        self.assertTrue(access.get("not_accessible"))
+
+    def test_run_modelangelo_dry_run_allows_stale_executable(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            m = root / "m.mrc"
+            f = root / "p.fasta"
+            m.write_bytes(b"\x00")
+            f.write_text(">A\nM\n", encoding="utf-8")
+            cfg = root / "model_builders.yaml"
+            cfg.write_text(
+                "model_angelo:\n"
+                "  executable: /root/anaconda3/envs/model_angelo/bin/model_angelo\n"
+                "  torch_home: /root/share/szs/CryoAgent/model-angelo/public/model_angelo_weights\n",
+                encoding="utf-8",
+            )
+            action = _make_action(str(m), str(f))
+
+            out = run_model_angelo(action, root, state=None, dry_run=True, model_builders_yaml=cfg)
+
+            self.assertEqual(out["status"], "dry_run")
+            self.assertTrue(out["success"])
+            self.assertIsNone(out["return_code"])
+            self.assertIn("[DRY-RUN] Would execute:", out["command"])
+            self.assertTrue(out.get("warnings"))
+            self.assertIn("ModelAngelo real execution blocked", " ".join(out.get("warnings") or []))
 
     def test_modelangelo_yaml_alias_merges(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -346,6 +384,45 @@ class TestRelionActionExecutorModelAngelo(unittest.TestCase):
                 mock_run.return_value = {"action_name": "run_modelangelo", "status": "dry_run"}
                 ex.execute(action, root, dry_run=True, state=None)
                 mock_run.assert_called_once()
+
+    def test_run_next_dry_run_does_not_crash_on_stale_modelangelo_path(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            schemes = root / "schemes.yaml"
+            schemes.write_text("schemes: {}\n", encoding="utf-8")
+            mb = root / "model_builders.yaml"
+            mb.write_text(
+                "model_angelo:\n"
+                "  executable: /root/anaconda3/envs/model_angelo/bin/model_angelo\n"
+                "  torch_home: /root/share/szs/CryoAgent/model-angelo/public/model_angelo_weights\n",
+                encoding="utf-8",
+            )
+            m = root / "m.mrc"
+            f = root / "p.fasta"
+            m.write_bytes(b"\x00")
+            f.write_text(">A\nM\n", encoding="utf-8")
+            action = Action(
+                name=ActionName.RUN_MODELANGELO,
+                reason="test",
+                parameters={
+                    "map_path": str(m),
+                    "sequence_path": str(f),
+                    "model_building_backend": "modelangelo",
+                    "model_building_availability": "unavailable",
+                    "model_building_execution_mode": "unavailable",
+                    "model_building_blocked_reason": "missing_dependency: modelangelo_executable",
+                    "model_building_missing_inputs": [],
+                    "model_building_missing_dependencies": ["modelangelo_executable"],
+                },
+                priority=70,
+            )
+            ex = RelionActionExecutor(schemes)
+
+            out = ex.execute(action, root, dry_run=True, state=None)
+
+            self.assertEqual(out["status"], "dry_run")
+            self.assertTrue(out["success"])
+            self.assertTrue(out.get("warnings"))
 
 
 class TestReportExecutionSection(unittest.TestCase):

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 import yaml
 
+from agent.backend_runtime import check_path_access
 from agent.backend_registry import (
     MODEL_BUILDING_BACKEND_METADATA,
     MODEL_BUILDING_INPUT_SPECS,
@@ -50,6 +51,27 @@ def _load_mica_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
         return {}
 
 
+def _load_modelangelo_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
+    p = config_path or (Path(__file__).resolve().parents[1] / "configs" / "model_builders.yaml")
+    if not p.is_file():
+        return {}
+    try:
+        data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+        if not isinstance(data, dict):
+            return {}
+        section = data.get("model_angelo") or data.get("modelangelo") or {}
+        return section if isinstance(section, dict) else {}
+    except (OSError, yaml.YAMLError):
+        return {}
+
+
+def _is_path_like(raw: Any) -> bool:
+    if raw is None or not str(raw).strip():
+        return False
+    s = str(raw).strip()
+    return s.startswith("~") or s.startswith(("/", "./", "../")) or "/" in s
+
+
 def _resolve_python(raw: Any) -> Optional[str]:
     if raw is not None and str(raw).strip():
         s = str(raw).strip()
@@ -70,6 +92,7 @@ def preflight_model_building(
     backend_id: str,
     params: Dict[str, Any],
     *,
+    modelangelo_config_path: Optional[Path] = None,
     emodelx_config_path: Optional[Path] = None,
     mica_config_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
@@ -169,10 +192,57 @@ def preflight_model_building(
         absent_optional = [f for f in sorted(opt) if not _field_present(effective, f)]
         if absent_optional:
             warnings.append(f"optional inputs not set: {', '.join(absent_optional[:8])}")
+        cfg = _load_modelangelo_config(modelangelo_config_path) if modelangelo_config_path is not None else {}
+        exe_raw = effective.get("model_angelo_executable") or effective.get("modelangelo_executable") or cfg.get("executable")
+        if _is_path_like(exe_raw):
+            exe_access = check_path_access(exe_raw)
+            if exe_access.get("not_accessible"):
+                missing_deps.append("modelangelo_executable")
+                warnings.append(f"modelangelo executable not accessible: {exe_raw}")
+            elif not exe_access.get("exists") or not exe_access.get("is_file"):
+                missing_deps.append("modelangelo_executable")
+                warnings.append(f"modelangelo executable not found: {exe_raw}")
+            elif not exe_access.get("executable"):
+                missing_deps.append("modelangelo_executable")
+                warnings.append(f"modelangelo executable is not executable: {exe_raw}")
+            if exe_access.get("path_stale"):
+                warnings.append(
+                    "modelangelo executable path is stale: "
+                    + ",".join(str(x) for x in exe_access.get("stale_reasons") or [])
+                )
+        torch_home = effective.get("torch_home") or cfg.get("torch_home")
+        weights_rel = str(cfg.get("weights_relpath") or "hub/checkpoints/model_angelo_v1.0")
+        if torch_home and str(torch_home).strip():
+            weights_path = Path(str(torch_home).strip()).expanduser() / weights_rel
+            weights_access = check_path_access(str(weights_path))
+            if not weights_access.get("exists") or weights_access.get("not_accessible"):
+                missing_deps.append("modelangelo_weights_dir")
+                warnings.append(f"modelangelo weights path not ready: {weights_path}")
+            if weights_access.get("path_stale"):
+                warnings.append(
+                    "modelangelo weights path is stale: "
+                    + ",".join(str(x) for x in weights_access.get("stale_reasons") or [])
+                )
 
     input_summary = "map_path=set, sequence_path=set"
     if bid == "mica":
         input_summary += f", af3_dir={_effective_af3_dir(effective)}"
+
+    if bid == "modelangelo" and missing_deps:
+        deps = list(dict.fromkeys(missing_deps))
+        return {
+            "backend_name": bid,
+            "category": category,
+            "available": False,
+            "execution_mode": "unavailable",
+            "placeholder": bool(meta.get("placeholder_execution", False)),
+            "missing_inputs": [],
+            "missing_dependencies": deps,
+            "warnings": warnings,
+            "blocked_reason": f"missing_dependency: {','.join(deps)}",
+            "recommended_action_name": model_building_backend_to_action_name(bid),
+            "input_summary": input_summary,
+        }
 
     if bid == "emodelx":
         cfg = _load_emodelx_config(emodelx_config_path)

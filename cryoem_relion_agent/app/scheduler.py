@@ -321,7 +321,11 @@ class Scheduler:
             pf = preflight_model_building(backend_id, merged, mica_config_path=cfg_path)
             merged["mica_preflight"] = pf
         else:
-            pf = preflight_model_building(backend_id, merged)
+            pf = preflight_model_building(
+                backend_id,
+                merged,
+                modelangelo_config_path=self.config_dir / "model_builders.yaml",
+            )
         merged["model_building_preflight"] = pf
         merged["model_building_backend"] = backend_id
         merged["model_building_availability"] = "available" if pf.get("available") else "unavailable"
@@ -766,6 +770,7 @@ class Scheduler:
         pf = preflight_model_building(
             mb_resolved,
             merged_params,
+            modelangelo_config_path=(self.config_dir / "model_builders.yaml") if mb_resolved == "modelangelo" else None,
             emodelx_config_path=(self.config_dir / "emodelx.yaml") if mb_resolved == "emodelx" else None,
             mica_config_path=(self.config_dir / "mica.yaml") if mb_resolved == "mica" else None,
         )

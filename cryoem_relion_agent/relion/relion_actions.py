@@ -31,6 +31,14 @@ def _model_building_preflight_blocked(action: Action) -> bool:
     )
 
 
+def _model_building_preflight_runtime_only(action: Action) -> bool:
+    if not isinstance(action.parameters, dict):
+        return False
+    missing_inputs = list(action.parameters.get("model_building_missing_inputs") or [])
+    missing_deps = list(action.parameters.get("model_building_missing_dependencies") or [])
+    return bool(missing_deps) and not missing_inputs
+
+
 def _picking_topaz_preflight_blocked(action: Action) -> bool:
     if str(action.parameters.get("picking_backend", "")).strip().lower() != "topaz":
         return False
@@ -465,7 +473,9 @@ class RelionActionExecutor:
             name = action.name.value
 
             if name == "run_modelangelo":
-                if _model_building_preflight_blocked(action):
+                if _model_building_preflight_blocked(action) and not (
+                    dry_run and _model_building_preflight_runtime_only(action)
+                ):
                     out: Dict[str, Any] = {
                         "action_name": name,
                         "status": "preflight_blocked",

@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
+from agent.backend_runtime import check_path_access
 from schemas.action import Action
 from schemas.execution_result import ExecutionResult
 from schemas.sample_state import SampleState
@@ -74,24 +75,46 @@ def _is_executable_path_like(s: str) -> bool:
     return False
 
 
-def _resolve_executable(exe_raw: Any) -> tuple[str, Optional[str]]:
+def _safe_resolve_path(path: Path) -> str:
+    try:
+        return str(path.resolve())
+    except (OSError, PermissionError):
+        return str(path)
+
+
+def _resolve_executable(exe_raw: Any) -> tuple[str, Optional[str], Dict[str, Any]]:
     """
-    Return (argv0, error_message).
+    Return (argv0, error_message, diagnostic).
 
     Bare names (e.g. ``model_angelo``) are passed through for PATH lookup.
     Path-like values must exist and be regular files.
     """
+    diagnostic: Dict[str, Any] = {"raw": exe_raw, "path_like": False, "access": None}
     if exe_raw is None:
-        return "model_angelo", None
+        return "model_angelo", None, diagnostic
     s = str(exe_raw).strip()
     if not s:
-        return "model_angelo", None
+        return "model_angelo", None, diagnostic
     if not _is_executable_path_like(s):
-        return s, None
-    p = Path(s).expanduser().resolve()
-    if not p.is_file():
-        return str(p), f"executable not found: {p}"
-    return str(p), None
+        return s, None, diagnostic
+    p = Path(s).expanduser()
+    diagnostic["path_like"] = True
+    diagnostic["path"] = _safe_resolve_path(p)
+    access = check_path_access(str(p))
+    diagnostic["access"] = access
+    resolved = str(access.get("path") or diagnostic["path"])
+    try:
+        resolved = _safe_resolve_path(p)
+    except (OSError, PermissionError):
+        pass
+    if access.get("not_accessible"):
+        detail = f" ({access.get('error')})" if access.get("error") else ""
+        return resolved, f"executable not accessible: {resolved}{detail}", diagnostic
+    if not access.get("exists") or not access.get("is_file"):
+        return resolved, f"executable not found: {resolved}", diagnostic
+    if not access.get("executable"):
+        return resolved, f"executable not executable: {resolved}", diagnostic
+    return resolved, None, diagnostic
 
 
 def _argv_to_shell_string(argv: List[str]) -> str:
@@ -161,7 +184,11 @@ def _resolve_torch_home(cfg: Dict[str, Any]) -> Optional[Path]:
         return Path(env_val.strip()).expanduser().resolve()
     cfg_val = cfg.get("torch_home")
     if cfg_val and str(cfg_val).strip():
-        return Path(str(cfg_val).strip()).expanduser().resolve()
+        p = Path(str(cfg_val).strip()).expanduser()
+        try:
+            return p.resolve()
+        except (OSError, PermissionError):
+            return p
     return None
 
 
@@ -169,7 +196,11 @@ def _resolve_weights_path(torch_home: Optional[Path], cfg: Dict[str, Any]) -> Op
     if torch_home is None:
         return None
     rel = str(cfg.get("weights_relpath", "hub/checkpoints/model_angelo_v1.0")).strip()
-    return (torch_home / rel).resolve()
+    p = torch_home / rel
+    try:
+        return p.resolve()
+    except (OSError, PermissionError):
+        return p
 
 
 def run_model_angelo(
@@ -236,8 +267,17 @@ def run_model_angelo(
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         output_dir = agent_root / runs_sub / stamp
 
-    exe, exe_err = _resolve_executable(cfg.get("executable", "model_angelo"))
+    exe, exe_err, exe_diag = _resolve_executable(cfg.get("executable", "model_angelo"))
+    warnings: List[str] = []
     if exe_err:
+        warnings.append(f"ModelAngelo real execution blocked: {exe_err}")
+    access = exe_diag.get("access") if isinstance(exe_diag, dict) else None
+    if isinstance(access, dict) and access.get("path_stale"):
+        warnings.append(
+            "ModelAngelo executable path is stale: "
+            + ",".join(str(x) for x in access.get("stale_reasons") or [])
+        )
+    if exe_err and not dry_run:
         er = ExecutionResult(
             action_name=action.name.value,
             dry_run=dry_run,
@@ -258,7 +298,22 @@ def run_model_angelo(
 
     torch_home = _resolve_torch_home(cfg)
     weights_path = _resolve_weights_path(torch_home, cfg)
-    weights_cached = bool(weights_path and weights_path.exists())
+    weights_cached = False
+    if weights_path:
+        weights_access = check_path_access(str(weights_path))
+        weights_cached = bool(weights_access.get("exists"))
+        if weights_access.get("path_stale") or weights_access.get("not_accessible") or not weights_access.get("exists"):
+            warnings.append(
+                "ModelAngelo weights path may block real execution: "
+                + str(weights_path)
+                + (
+                    " ("
+                    + ",".join(str(x) for x in weights_access.get("stale_reasons") or [])
+                    + ")"
+                    if weights_access.get("stale_reasons")
+                    else ""
+                )
+            )
     env = os.environ.copy()
     if torch_home is not None:
         env["TORCH_HOME"] = str(torch_home)
@@ -272,11 +327,11 @@ def run_model_angelo(
     if dry_run:
         er = ExecutionResult(
             action_name=action.name.value,
-            command=cmd_str,
+            command=f"[DRY-RUN] Would execute: {cmd_str}",
             command_argv=argv,
             dry_run=True,
             status="dry_run",
-            return_code=0,
+            return_code=None,
             stdout=f"[DRY-RUN] Would execute: {cmd_str}\n{cache_msg}",
             stderr="",
             output_dir=str(output_dir),
@@ -285,7 +340,10 @@ def run_model_angelo(
             error_message=None,
         )
         logger.info("ModelAngelo dry-run: %s", cmd_str)
-        return er.to_serializable_dict()
+        out = er.to_serializable_dict()
+        out["success"] = True
+        out["warnings"] = warnings
+        return out
 
     try:
         output_dir.mkdir(parents=True, exist_ok=True)

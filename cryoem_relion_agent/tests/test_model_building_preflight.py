@@ -302,6 +302,26 @@ class TestModelBuildingPreflight(unittest.TestCase):
         self.assertEqual(r["execution_mode"], "real")
         self.assertFalse(r["placeholder"])
 
+    def test_modelangelo_stale_configured_executable_unavailable(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cfg = root / "model_builders.yaml"
+            cfg.write_text(
+                "model_angelo:\n"
+                "  executable: /root/anaconda3/envs/model_angelo/bin/model_angelo\n"
+                "  torch_home: /root/share/szs/CryoAgent/model-angelo/public/model_angelo_weights\n",
+                encoding="utf-8",
+            )
+            r = preflight_model_building(
+                "modelangelo",
+                {"map_path": "/m.mrc", "sequence_path": "/s.fasta"},
+                modelangelo_config_path=cfg,
+            )
+            self.assertFalse(r["available"])
+            self.assertEqual(r["execution_mode"], "unavailable")
+            self.assertIn("modelangelo_executable", r["missing_dependencies"])
+            self.assertTrue(any("stale" in w for w in r["warnings"]))
+
 
 if __name__ == "__main__":
     unittest.main()
