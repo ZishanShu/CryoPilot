@@ -400,6 +400,47 @@ class Scheduler:
             backend_id=backend_id,
             action_name=action_name,
         )
+
+        # Build backend_runtime_matrix and populate rejected_backends for any
+        # candidate whose real_run_available=False.
+        sec = self.policy_engine.backend_registry.section("model_building")
+        allowed_backends = [str(b).strip().lower() for b in sec.get("allowed_backends", []) if str(b).strip()]
+        runtime_matrix: Dict[str, Dict[str, Any]] = {}
+        for b in allowed_backends:
+            if b == backend_id:
+                b_pf = pf
+            else:
+                try:
+                    _, _, b_pf = self._prepare_model_building_backend(
+                        state=state,
+                        backend_id=b,
+                        params=dict(action.parameters),
+                    )
+                except Exception:
+                    b_pf = {"real_run_available": False, "dry_run_available": False, "blocked_reason": "preflight_error"}
+            runtime_matrix[b] = {
+                "real_run_available": bool(b_pf.get("real_run_available")),
+                "dry_run_available": bool(b_pf.get("dry_run_available")),
+                "blocked_reason": b_pf.get("blocked_reason") or "",
+                "missing_dependencies": list(b_pf.get("missing_dependencies") or []),
+            }
+
+        decision = dict(decision)
+        decision["backend_runtime_matrix"] = runtime_matrix
+        rejected = list(decision.get("rejected_backends") or [])
+        rejection_reasons = dict(decision.get("rejection_reasons") or {})
+        for b, info in runtime_matrix.items():
+            if not info["real_run_available"] and b not in rejected:
+                rejected.append(b)
+                reason = info.get("blocked_reason") or (
+                    "missing_dependencies:" + ",".join(info["missing_dependencies"])
+                    if info["missing_dependencies"]
+                    else "real_run_unavailable"
+                )
+                rejection_reasons.setdefault(b, reason)
+        decision["rejected_backends"] = rejected
+        decision["rejection_reasons"] = rejection_reasons
+
         merged["model_building_selection_decision"] = decision
         if action_name == ActionName.RUN_EMODELX:
             if pf.get("repo_path"):

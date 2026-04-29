@@ -545,6 +545,33 @@ class TestRunNextModelAngeloSelectionConsistency(unittest.TestCase):
         self.assertEqual(enriched.parameters.get("model_building_backend"), "emodelx")
         self.assertEqual(decision.get("selected_backend"), "emodelx")
 
+    def test_router_records_rejected_backends(self) -> None:
+        sched = Scheduler(Path("/tmp"))
+        state = SampleState(
+            project_id="p",
+            project_path="/tmp/proj",
+            stage="PostProcess",
+            status="running",
+            map_path="/tmp/map.mrc",
+            sequence_path="/tmp/seq.fasta",
+        )
+        action = Action(
+            name=ActionName.RUN_MODELANGELO,
+            reason="test",
+            parameters={
+                "map_path": "/tmp/map.mrc",
+                "sequence_path": "/tmp/seq.fasta",
+                "model_building_backend": "modelangelo",
+            },
+            priority=70,
+        )
+
+        enriched = sched._enrich_model_building_action(state, action)
+
+        decision = enriched.parameters.get("model_building_selection_decision") or {}
+        self.assertIn("backend_runtime_matrix", decision)
+        self.assertTrue(decision.get("rejected_backends"))
+
 
 class TestReportExecutionSection(unittest.TestCase):
     """Report includes Execution from state.last_execution."""
