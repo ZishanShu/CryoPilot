@@ -12,6 +12,13 @@ from agent.failure_audit import (
 )
 
 
+def _safe_is_file(path: Path) -> bool:
+    try:
+        return path.is_file()
+    except (OSError, PermissionError):
+        return False
+
+
 def _minimal_latest(benchmark_id: str = "bench_case_1", run_id: str = "bench_run_1") -> dict:
     return {
         "run_metadata": {"run_id": run_id, "benchmark_count": 1},
@@ -178,7 +185,7 @@ class TestFailureAuditBuild(unittest.TestCase):
 
 
 @unittest.skipUnless(
-    Path(__file__).resolve().parents[1].joinpath(".cryoem_agent/benchmarks/latest.json").is_file(),
+    _safe_is_file(Path(__file__).resolve().parents[1].joinpath(".cryoem_agent/benchmarks/latest.json")),
     "repo benchmark latest.json not present",
 )
 class TestFailureAuditRealFixtures(unittest.TestCase):
@@ -188,7 +195,7 @@ class TestFailureAuditRealFixtures(unittest.TestCase):
         smoke_path = (
             Path("/root/share/szs/CryoAgent/real_runs/cryoppp_topaz_smoke/10005/outputs/reports/smoke_run_summary.json")
         )
-        if not smoke_path.is_file():
+        if not _safe_is_file(smoke_path):
             self.skipTest("real smoke summary not in workspace")
         latest = json.loads(latest_path.read_text(encoding="utf-8"))
         smoke = json.loads(smoke_path.read_text(encoding="utf-8"))

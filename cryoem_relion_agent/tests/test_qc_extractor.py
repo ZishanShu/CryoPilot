@@ -50,7 +50,11 @@ class TestTutorial50Project(unittest.TestCase):
     _TUTORIAL = Path("/root/share/szs/CryoAgent/Tutorial5.0")
 
     def test_tutorial_resolution_not_1_0_and_micrographs_sane(self) -> None:
-        if not self._TUTORIAL.is_dir():
+        try:
+            present = self._TUTORIAL.is_dir()
+        except (OSError, PermissionError):
+            present = False
+        if not present:
             self.skipTest("Tutorial5.0 not present")
         ext = QCExtractor()
         state, qc = ext.extract(self._TUTORIAL)
