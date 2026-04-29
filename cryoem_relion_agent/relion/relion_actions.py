@@ -521,7 +521,7 @@ class RelionActionExecutor:
                     if _picking_topaz_preflight_blocked(act):
                         out_pb: Dict[str, Any] = {
                             "action_name": name,
-                            "status": "blocked",
+                            "status": "preflight_blocked",
                             "dry_run": dry_run,
                             "success": False,
                             "command": None,
@@ -541,7 +541,7 @@ class RelionActionExecutor:
                     if not isinstance(pf, dict):
                         out_pb = {
                             "action_name": name,
-                            "status": "blocked",
+                            "status": "preflight_blocked",
                             "dry_run": dry_run,
                             "success": False,
                             "error_message": "topaz_preflight missing",
@@ -654,7 +654,7 @@ class RelionActionExecutor:
                 if _heterogeneity_cryodrgn_preflight_blocked(act):
                     out_cd: Dict[str, Any] = {
                         "action_name": name,
-                        "status": "blocked",
+                        "status": "preflight_blocked",
                         "dry_run": dry_run,
                         "success": False,
                         "command": None,
@@ -675,7 +675,7 @@ class RelionActionExecutor:
                 if not isinstance(pf, dict):
                     out_cd = {
                         "action_name": name,
-                        "status": "blocked",
+                        "status": "preflight_blocked",
                         "dry_run": dry_run,
                         "success": False,
                         "command": None,
@@ -828,7 +828,7 @@ class RelionActionExecutor:
                     if _model_building_preflight_blocked(act) and not dry_run:
                         out = {
                             "action_name": name,
-                            "status": "blocked",
+                            "status": "preflight_blocked",
                             "dry_run": dry_run,
                             "success": False,
                             "command": None,
@@ -849,7 +849,7 @@ class RelionActionExecutor:
                     if not isinstance(pf, dict):
                         out = {
                             "action_name": name,
-                            "status": "blocked",
+                            "status": "preflight_blocked",
                             "dry_run": dry_run,
                             "success": False,
                             "execution_mode": "unavailable",
@@ -908,7 +908,7 @@ class RelionActionExecutor:
                     if _model_building_preflight_blocked(act) and not dry_run:
                         out = {
                             "action_name": name,
-                            "status": "blocked",
+                            "status": "preflight_blocked",
                             "dry_run": dry_run,
                             "success": False,
                             "command": None,
@@ -929,7 +929,7 @@ class RelionActionExecutor:
                     if not isinstance(pf, dict):
                         out = {
                             "action_name": name,
-                            "status": "blocked",
+                            "status": "preflight_blocked",
                             "dry_run": dry_run,
                             "success": False,
                             "execution_mode": "unavailable",
@@ -970,7 +970,7 @@ class RelionActionExecutor:
                 if _model_building_preflight_blocked(action) and not dry_run:
                     out = {
                         "action_name": name,
-                        "status": "blocked",
+                        "status": "preflight_blocked",
                         "dry_run": dry_run,
                         "success": False,
                         "command": None,

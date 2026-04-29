@@ -578,6 +578,7 @@ def preflight_backend(
         "backend_name": name,
         "category": definition.get("category", "unknown"),
         "available": bool(dry_run_available if dry_run else real_run_available),
+        "status": "dry_run" if dry_run and dry_run_available else ("available" if real_run_available else "blocked"),
         "dry_run": bool(dry_run),
         "input_suitable": not missing_inputs,
         "dry_run_available": bool(dry_run_available),
