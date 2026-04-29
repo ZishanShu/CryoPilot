@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 
 import typer
 
+from agent.backend_runtime import preflight_all_backends, scan_stale_paths, summarize_backend_matrix
 from agent.structure_router import ModelingContext
 from app.scheduler import Scheduler
 from memory.case_store import CaseStore
@@ -36,6 +37,13 @@ def validate_sequence_path(sequence: Optional[Path]) -> Optional[Path]:
         typer.secho(f"Error: --sequence must point to a regular file: {sequence}", err=True)
         raise typer.Exit(code=1)
     return sequence
+
+
+def _write_runtime_report(report: Dict[str, Any], out_json: Path, out_md: Path) -> None:
+    out_json.parent.mkdir(parents=True, exist_ok=True)
+    out_md.parent.mkdir(parents=True, exist_ok=True)
+    out_json.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+    out_md.write_text(summarize_backend_matrix(report), encoding="utf-8")
 
 
 @app.command("scan-project")
@@ -266,6 +274,45 @@ def run_picking_benchmark(
             indent=2,
         )
     )
+
+
+@app.command("diagnose-environment")
+def diagnose_environment(
+    project: Path = typer.Option(..., exists=True, file_okay=False, dir_okay=True),
+    out_json: Path = typer.Option(..., "--out-json", help="Output JSON diagnostics path."),
+    out_md: Path = typer.Option(..., "--out-md", help="Output Markdown diagnostics path."),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Diagnose backend runtime portability and stale paths after migration."""
+    setup_logging(verbose)
+    package_root = Path(__file__).resolve().parents[1]
+    report = preflight_all_backends(project_root=project, dry_run=True)
+    report["report_type"] = "cryoagent_environment_diagnostics"
+    report["stale_paths"] = scan_stale_paths(package_root)
+    report["project_stale_paths"] = scan_stale_paths(project)
+    _write_runtime_report(report, out_json, out_md)
+    typer.echo(json.dumps({"out_json": str(out_json), "out_md": str(out_md)}, indent=2))
+
+
+@app.command("check-backends")
+def check_backends(
+    project: Path = typer.Option(..., exists=True, file_okay=False, dir_okay=True),
+    sequence: Optional[Path] = typer.Option(
+        None,
+        "--sequence",
+        help="Path to FASTA/sequence file used for report context.",
+    ),
+    out_json: Path = typer.Option(..., "--out-json", help="Output JSON diagnostics path."),
+    out_md: Path = typer.Option(..., "--out-md", help="Output Markdown diagnostics path."),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Check registered backend runtime availability without running jobs."""
+    setup_logging(verbose)
+    validate_sequence_path(sequence)
+    report = preflight_all_backends(project_root=project, sequence_path=sequence, dry_run=True)
+    report["report_type"] = "cryoagent_backend_runtime_check"
+    _write_runtime_report(report, out_json, out_md)
+    typer.echo(json.dumps({"out_json": str(out_json), "out_md": str(out_md)}, indent=2))
 
 
 @app.command("init-db")
