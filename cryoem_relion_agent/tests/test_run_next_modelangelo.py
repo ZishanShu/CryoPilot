@@ -1,7 +1,8 @@
 """Tests for ModelAngelo execution path (command build, dry-run, subprocess mock)."""
 
 from __future__ import annotations
-
+import os
+from pathlib import Path
 import json
 import unittest
 from pathlib import Path
@@ -17,6 +18,23 @@ from schemas.action import Action, ActionName
 from schemas.qc_metrics import QCMetrics
 from schemas.sample_state import SampleState
 
+def _safe_exists(path: Path) -> bool:
+    try:
+        return path.exists()
+    except (PermissionError, OSError):
+        return False
+
+def _safe_is_dir(path: Path) -> bool:
+    try:
+        return path.is_dir()
+    except (PermissionError, OSError):
+        return False
+
+def _safe_is_file(path: Path) -> bool:
+    try:
+        return path.is_file()
+    except (PermissionError, OSError):
+        return False
 
 def _make_action(map_path: str | None, seq_path: str | None) -> Action:
     params: dict = {}
@@ -603,14 +621,23 @@ class TestReportExecutionSection(unittest.TestCase):
         self.assertIn("/tmp/out", md)
 
 
-TUTORIAL50 = Path("/root/share/szs/CryoAgent/Tutorial5.0")
-MODELANGELO_EXE = Path("/root/anaconda3/envs/model_angelo/bin/model_angelo")
-
+TUTORIAL50 = Path(
+    os.environ.get(
+        "CRYOAGENT_TUTORIAL50",
+        str(Path.home() / "CryoAgent/relion_tutorial/Tutorial5.0"),
+    )
+)
+MODELANGELO_EXE = Path(
+    os.environ.get(
+        "MODELANGELO_EXECUTABLE",
+        "model_angelo",
+    )
+)
 
 @unittest.skipUnless(
-    TUTORIAL50.is_dir()
-    and (TUTORIAL50 / "PostProcess" / "job035" / "postprocess_masked.mrc").is_file()
-    and MODELANGELO_EXE.is_file(),
+    _safe_is_dir(TUTORIAL50)
+    and _safe_is_file(TUTORIAL50 / "PostProcess" / "job035" / "postprocess_masked.mrc")
+    and _safe_is_file(MODELANGELO_EXE),
     "Tutorial5.0 fixture or ModelAngelo executable not present",
 )
 class TestTutorial50DryRunIntegration(unittest.TestCase):
