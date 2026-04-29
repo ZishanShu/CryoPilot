@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
-from agent.backend_runtime import check_path_access
+from agent.backend_runtime import _expand_config_tree, check_path_access
 from schemas.action import Action
 from schemas.execution_result import ExecutionResult
 from schemas.sample_state import SampleState
@@ -48,7 +48,7 @@ def _load_model_angelo_config(config_path: Path) -> Dict[str, Any]:
     try:
         if not config_path.exists():
             return DEFAULT_MODEL_BUILDERS["model_angelo"]
-        data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+        data = _expand_config_tree(yaml.safe_load(config_path.read_text(encoding="utf-8")) or {})
         ma = data.get("model_angelo")
         if ma is None:
             ma = data.get("modelangelo") or {}

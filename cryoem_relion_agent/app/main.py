@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 
 import typer
 
-from agent.backend_runtime import preflight_all_backends, scan_stale_paths, summarize_backend_matrix
+from agent.backend_runtime import environment_fingerprint, preflight_all_backends, scan_stale_paths, summarize_backend_matrix
 from agent.structure_router import ModelingContext
 from app.scheduler import Scheduler
 from memory.case_store import CaseStore
@@ -290,6 +290,11 @@ def diagnose_environment(
     report["report_type"] = "cryoagent_environment_diagnostics"
     report["stale_paths"] = scan_stale_paths(package_root)
     report["project_stale_paths"] = scan_stale_paths(project)
+    report["stale_absolute_paths"] = list(report["stale_paths"].get("findings") or []) + list(
+        report["project_stale_paths"].get("findings") or []
+    )
+    report["environment"] = environment_fingerprint()
+    report["project_output_dir"] = report.get("backends", {}).get("modelangelo", {}).get("path_checks", {}).get("output_dir")
     _write_runtime_report(report, out_json, out_md)
     typer.echo(json.dumps({"out_json": str(out_json), "out_md": str(out_md)}, indent=2))
 

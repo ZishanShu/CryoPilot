@@ -80,6 +80,32 @@ class TestBackendRuntime(unittest.TestCase):
             self.assertIn("topaz_executable", result["missing_dependencies"])
             self.assertIn("missing_runtime_dependencies", result["blocked_reason"])
 
+    def test_resolver_handles_permission_error_without_traceback(self) -> None:
+        with patch("agent.backend_runtime.Path.exists", side_effect=PermissionError("denied")):
+            result = preflight_backend(
+                "modelangelo",
+                dry_run=True,
+                params={"executable": "/root/anaconda3/envs/model_angelo/bin/model_angelo"},
+            )
+
+        self.assertIn(result["executable_status"], {"not_accessible", "stale_path"})
+        self.assertIn("modelangelo_executable", result["missing_dependencies"])
+
+    def test_real_run_blocks_missing_backend(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = preflight_backend(
+                "modelangelo",
+                project_root=root,
+                output_dir=root / "out",
+                dry_run=False,
+                params={"executable": str(root / "missing_model_angelo"), "weights_dir": str(root / "missing_weights")},
+            )
+
+            self.assertFalse(result["real_run_available"])
+            self.assertIn("modelangelo_executable", result["missing_dependencies"])
+            self.assertIn("missing_runtime_dependencies", result["blocked_reason"])
+
 
 class TestBackendRuntimeCLI(unittest.TestCase):
     def test_check_backends_writes_json_for_registered_runtime_backends(self) -> None:
@@ -110,6 +136,9 @@ class TestBackendRuntimeCLI(unittest.TestCase):
             data = json.loads(out_json.read_text(encoding="utf-8"))
             for backend in ("modelangelo", "emodelx", "mica", "topaz", "cryodrgn"):
                 self.assertIn(backend, data["backends"])
+                self.assertIn("input_suitable", data["backends"][backend])
+                self.assertIn("executable_status", data["backends"][backend])
+            self.assertIn("relion", data["backends"])
             self.assertTrue(out_md.read_text(encoding="utf-8").startswith("# CryoAgent backend runtime preflight"))
 
     def test_diagnose_environment_writes_stale_path_findings(self) -> None:
@@ -138,6 +167,38 @@ class TestBackendRuntimeCLI(unittest.TestCase):
             project_findings = data["project_stale_paths"]["findings"]
             self.assertTrue(any(item["path"] == "/root/share/old_weights" for item in project_findings))
             self.assertIn("stale_paths", data)
+
+    def test_diagnose_environment_detects_stale_root_paths(self) -> None:
+        runner = CliRunner()
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "model_builders.yaml").write_text(
+                "model_angelo:\n"
+                "  executable: /root/anaconda3/envs/model_angelo/bin/model_angelo\n"
+                "  torch_home: /root/share/weights\n",
+                encoding="utf-8",
+            )
+            out_json = root / "diagnose.json"
+            out_md = root / "diagnose.md"
+
+            res = runner.invoke(
+                app,
+                [
+                    "diagnose-environment",
+                    "--project",
+                    str(root),
+                    "--out-json",
+                    str(out_json),
+                    "--out-md",
+                    str(out_md),
+                ],
+            )
+
+            self.assertEqual(res.exit_code, 0, res.output)
+            data = json.loads(out_json.read_text(encoding="utf-8"))
+            findings = data["project_stale_paths"]["findings"]
+            self.assertTrue(any("/root/anaconda3" in item["path"] for item in findings))
+            self.assertTrue(any("/root/share" in item["path"] for item in findings))
 
 
 if __name__ == "__main__":
