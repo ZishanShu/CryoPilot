@@ -361,35 +361,49 @@ class Scheduler:
         availability snapshot, but this stage does not implement runtime-aware
         action rewrites. Until that rewrite exists, report the selected backend
         as the backend encoded by ``action.name`` / ``model_building_backend``.
+
+        Even in dry-run mode, candidates that are not available for real
+        execution are recorded in rejected_backends so the decision trace makes
+        runtime blockers auditable.
         """
         selected = str(decision.get("selected_backend") or "").strip().lower()
-        if selected == backend_id:
-            return decision
         aligned = dict(decision)
-        rejected = [str(x) for x in aligned.get("rejected_backends") or [] if str(x) != backend_id]
-        if selected and selected not in rejected:
-            rejected.append(selected)
+
+        rejected = [str(x) for x in aligned.get("rejected_backends") or []]
         reasons = dict(aligned.get("rejection_reasons") or {})
-        if selected:
+
+        if selected and selected != backend_id:
+            rejected = [x for x in rejected if x != backend_id]
+            if selected not in rejected:
+                rejected.append(selected)
             reasons.setdefault(selected, "not_executed_stage33b_lite_no_runtime_action_rewrite")
-        reasons.pop(backend_id, None)
+            reasons.pop(backend_id, None)
+            aligned["selection_reason"] = "action_backend_selected_no_runtime_fallback"
+            aligned["fallback_applied"] = False
+
         aligned["selected_backend"] = backend_id
-        aligned["selection_reason"] = "action_backend_selected_no_runtime_fallback"
-        aligned["fallback_applied"] = False
-        aligned["rejected_backends"] = rejected
-        aligned["rejection_reasons"] = reasons
+
         if isinstance(runtime_matrix, dict):
             for candidate, runtime in runtime_matrix.items():
-                if candidate == backend_id or not isinstance(runtime, dict):
+                candidate = str(candidate).strip().lower()
+                if not candidate or not isinstance(runtime, dict):
                     continue
+
                 if runtime.get("real_run_available") is False:
-                    if candidate not in aligned["rejected_backends"]:
-                        aligned["rejected_backends"].append(candidate)
-                    missing = ",".join(runtime.get("missing_dependencies") or runtime.get("missing_inputs") or [])
-                    aligned["rejection_reasons"].setdefault(
-                        candidate,
-                        str(runtime.get("blocked_reason") or f"real_run_unavailable:{missing}" or "real_run_unavailable"),
-                    )
+                    if candidate not in rejected:
+                        rejected.append(candidate)
+
+                    missing_values = runtime.get("missing_dependencies") or runtime.get("missing_inputs") or []
+                    missing = ",".join(str(x) for x in missing_values)
+                    reason = runtime.get("blocked_reason")
+                    if not reason:
+                        reason = f"real_run_unavailable:{missing}" if missing else "real_run_unavailable"
+
+                    reasons.setdefault(candidate, str(reason))
+
+        aligned["rejected_backends"] = rejected
+        aligned["rejection_reasons"] = reasons
+
         return aligned
 
     def _enrich_model_building_action(self, state, action: Action) -> Action:
