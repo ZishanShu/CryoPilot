@@ -9,6 +9,8 @@ from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
 from agent.reporter import Reporter
+from app.scheduler import Scheduler
+from agent.structure_router import ModelingContext
 from relion.model_angelo_runner import _resolve_executable, run_model_angelo
 from relion.relion_actions import RelionActionExecutor
 from schemas.action import Action, ActionName
@@ -423,6 +425,125 @@ class TestRelionActionExecutorModelAngelo(unittest.TestCase):
             self.assertEqual(out["status"], "dry_run")
             self.assertTrue(out["success"])
             self.assertTrue(out.get("warnings"))
+
+
+class TestRunNextModelAngeloSelectionConsistency(unittest.TestCase):
+    def test_run_next_dry_run_selected_backend_matches_action_name(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cfg = root / "agent" / "configs"
+            cfg.mkdir(parents=True)
+            for name in ("policy_rules.yaml", "router_rules.yaml", "schemes.yaml"):
+                src = Path(__file__).resolve().parents[1] / "configs" / name
+                (cfg / name).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+            (cfg / "model_builders.yaml").write_text(
+                "model_angelo:\n"
+                "  executable: /root/anaconda3/envs/model_angelo/bin/model_angelo\n"
+                "  torch_home: /root/share/szs/CryoAgent/model-angelo/public/model_angelo_weights\n",
+                encoding="utf-8",
+            )
+            project = root / "project"
+            project.mkdir()
+            m = project / "postprocess_masked.mrc"
+            f = project / "seq.fasta"
+            m.write_bytes(b"\x00")
+            f.write_text(">A\nM\n", encoding="utf-8")
+            sched = Scheduler(project_root=project, base_dir=root / "agent")
+            state = SampleState(
+                project_id="p",
+                project_path=str(project),
+                stage="PostProcess",
+                status="running",
+                map_path=str(m),
+                sequence_path=str(f),
+            )
+            qc = QCMetrics(
+                motioncorr_completed=True,
+                ctf_completed=True,
+                picking_completed=True,
+                class2d_completed=True,
+                init3d_completed=True,
+                refine3d_completed=True,
+                current_resolution=3.8,
+            )
+            with patch.object(sched, "scan_project", return_value=(state, qc)):
+                action, result = sched.run_next(dry_run=True, sequence_override=f)
+
+            decision = action.parameters.get("model_building_selection_decision") or {}
+            self.assertEqual(action.name, ActionName.RUN_MODELANGELO)
+            self.assertEqual(result.get("action_name"), "run_modelangelo")
+            self.assertEqual(action.parameters.get("model_building_backend"), "modelangelo")
+            self.assertEqual(result.get("model_building_backend"), "modelangelo")
+            self.assertEqual(decision.get("selected_backend"), "modelangelo")
+            self.assertFalse(decision.get("fallback_applied"))
+            self.assertNotEqual(decision.get("selection_reason"), "map_sequence_present_and_emodelx_available")
+            self.assertEqual(result.get("status"), "dry_run")
+            self.assertTrue(result.get("success"))
+
+            history_lines = sched.history_file.read_text(encoding="utf-8").splitlines()
+            execution_entries = [json.loads(line) for line in history_lines if '"execution_status": "dry_run"' in line]
+            self.assertTrue(execution_entries)
+            summary = execution_entries[-1]["output_summary"]
+            self.assertIn("model_building_backend=modelangelo", summary)
+            self.assertNotIn("selected=run_emodelx", summary)
+
+    def test_modelangelo_unavailable_does_not_claim_emodelx_selected_unless_action_is_emodelx(self) -> None:
+        sched = Scheduler(Path("/tmp"))
+        state = SampleState(
+            project_id="p",
+            project_path="/tmp/proj",
+            stage="PostProcess",
+            status="running",
+            map_path="/tmp/map.mrc",
+            sequence_path="/tmp/seq.fasta",
+        )
+        action = Action(
+            name=ActionName.RUN_MODELANGELO,
+            reason="test",
+            parameters={
+                "map_path": "/tmp/map.mrc",
+                "sequence_path": "/tmp/seq.fasta",
+                "model_building_backend": "modelangelo",
+            },
+            priority=70,
+        )
+
+        enriched = sched._enrich_model_building_action(state, action)
+
+        decision = enriched.parameters.get("model_building_selection_decision") or {}
+        self.assertEqual(enriched.name, ActionName.RUN_MODELANGELO)
+        self.assertEqual(enriched.parameters.get("model_building_backend"), "modelangelo")
+        self.assertEqual(decision.get("selected_backend"), "modelangelo")
+        self.assertFalse(decision.get("fallback_applied"))
+        self.assertNotEqual(decision.get("selection_reason"), "map_sequence_present_and_emodelx_available")
+
+    def test_emodelx_action_keeps_selected_backend_emodelx(self) -> None:
+        sched = Scheduler(Path("/tmp"))
+        state = SampleState(
+            project_id="p",
+            project_path="/tmp/proj",
+            stage="PostProcess",
+            status="running",
+            map_path="/tmp/map.mrc",
+            sequence_path="/tmp/seq.fasta",
+        )
+        action = Action(
+            name=ActionName.RUN_EMODELX,
+            reason="test",
+            parameters={
+                "map_path": "/tmp/map.mrc",
+                "sequence_path": "/tmp/seq.fasta",
+                "model_building_backend": "emodelx",
+            },
+            priority=80,
+        )
+
+        enriched = sched._enrich_model_building_action(state, action)
+
+        decision = enriched.parameters.get("model_building_selection_decision") or {}
+        self.assertEqual(enriched.name, ActionName.RUN_EMODELX)
+        self.assertEqual(enriched.parameters.get("model_building_backend"), "emodelx")
+        self.assertEqual(decision.get("selected_backend"), "emodelx")
 
 
 class TestReportExecutionSection(unittest.TestCase):

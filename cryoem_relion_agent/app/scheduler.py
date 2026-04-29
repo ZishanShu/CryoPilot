@@ -292,33 +292,44 @@ class Scheduler:
         merged["heterogeneity_selection_decision"] = decision
         return action.model_copy(update={"parameters": merged})
 
-    def _enrich_model_building_action(self, state, action: Action) -> Action:
-        """Model-building: run structured preflight for the resolved backend."""
-        if action.name not in {ActionName.RUN_MODELANGELO, ActionName.RUN_EMODELX, ActionName.RUN_MICA}:
-            return action
-        backend_id = str(action.parameters.get("model_building_backend") or model_action_to_backend(action.name.value)).strip().lower()
-        merged = dict(action.parameters)
-        if action.name == ActionName.RUN_EMODELX:
+    def _prepare_model_building_backend(
+        self,
+        *,
+        state,
+        backend_id: str,
+        params: Dict[str, Any],
+    ) -> tuple[ActionName, Dict[str, Any], Dict[str, Any]]:
+        """Prepare params + preflight for one model-building backend."""
+        action_name_str = model_building_backend_to_action_name(backend_id)
+        try:
+            action_name = ActionName(action_name_str)
+        except ValueError:
+            action_name = ActionName.RUN_MODELANGELO
+        merged = dict(params)
+        merged["model_building_backend"] = backend_id
+        if action_name == ActionName.RUN_EMODELX:
             merged.setdefault("chain_count", merged.get("chain_count") or 1)
             merged.setdefault(
                 "output_dir",
                 str(Path(state.project_path) / "ModelBuilding" / "EModelX" / "job_agent"),
             )
-            cfg_path = self.config_dir / "emodelx.yaml"
-            pf = preflight_model_building(backend_id, merged, emodelx_config_path=cfg_path)
+            merged.setdefault("emodelx_protocol", "temp_free")
+            default_repo = self.base_dir.parent / "EModelX"
+            if default_repo.is_dir():
+                merged.setdefault("emodelx_repo_dir", str(default_repo))
+            pf = preflight_model_building(backend_id, merged, emodelx_config_path=self.config_dir / "emodelx.yaml")
             merged["emodelx_preflight"] = pf
-        elif action.name == ActionName.RUN_MICA:
+        elif action_name == ActionName.RUN_MICA:
             merged.setdefault("chain_count", merged.get("chain_count") or 1)
             merged.setdefault(
                 "output_dir",
                 str(Path(state.project_path) / "ModelBuilding" / "MICA" / "job_agent"),
             )
             merged.setdefault("protocol", "AF3_struct")
-            cfg_path = self.config_dir / "mica.yaml"
             default_repo = self.base_dir.parent / "MICA"
             if default_repo.is_dir():
                 merged.setdefault("mica_repo_dir", str(default_repo))
-            pf = preflight_model_building(backend_id, merged, mica_config_path=cfg_path)
+            pf = preflight_model_building(backend_id, merged, mica_config_path=self.config_dir / "mica.yaml")
             merged["mica_preflight"] = pf
         else:
             pf = preflight_model_building(
@@ -327,12 +338,56 @@ class Scheduler:
                 modelangelo_config_path=self.config_dir / "model_builders.yaml",
             )
         merged["model_building_preflight"] = pf
-        merged["model_building_backend"] = backend_id
         merged["model_building_availability"] = "available" if pf.get("available") else "unavailable"
         merged["model_building_execution_mode"] = str(pf.get("execution_mode") or "unavailable")
         merged["model_building_blocked_reason"] = pf.get("blocked_reason") or ""
         merged["model_building_missing_inputs"] = list(pf.get("missing_inputs") or [])
         merged["model_building_missing_dependencies"] = list(pf.get("missing_dependencies") or [])
+        return action_name, merged, pf
+
+    @staticmethod
+    def _align_model_building_selection_with_action(
+        decision: Dict[str, Any],
+        *,
+        backend_id: str,
+        action_name: ActionName,
+    ) -> Dict[str, Any]:
+        """
+        Keep Stage 33B-lite selection reports consistent with the action we execute.
+
+        The selector can identify a better fallback candidate from a partial
+        availability snapshot, but this stage does not implement runtime-aware
+        action rewrites. Until that rewrite exists, report the selected backend
+        as the backend encoded by ``action.name`` / ``model_building_backend``.
+        """
+        selected = str(decision.get("selected_backend") or "").strip().lower()
+        if selected == backend_id:
+            return decision
+        aligned = dict(decision)
+        rejected = [str(x) for x in aligned.get("rejected_backends") or [] if str(x) != backend_id]
+        if selected and selected not in rejected:
+            rejected.append(selected)
+        reasons = dict(aligned.get("rejection_reasons") or {})
+        if selected:
+            reasons.setdefault(selected, "not_executed_stage33b_lite_no_runtime_action_rewrite")
+        reasons.pop(backend_id, None)
+        aligned["selected_backend"] = backend_id
+        aligned["selection_reason"] = "action_backend_selected_no_runtime_fallback"
+        aligned["fallback_applied"] = False
+        aligned["rejected_backends"] = rejected
+        aligned["rejection_reasons"] = reasons
+        return aligned
+
+    def _enrich_model_building_action(self, state, action: Action) -> Action:
+        """Model-building: run structured preflight for the resolved backend."""
+        if action.name not in {ActionName.RUN_MODELANGELO, ActionName.RUN_EMODELX, ActionName.RUN_MICA}:
+            return action
+        backend_id = str(action.parameters.get("model_building_backend") or model_action_to_backend(action.name.value)).strip().lower()
+        action_name, merged, pf = self._prepare_model_building_backend(
+            state=state,
+            backend_id=backend_id,
+            params=dict(action.parameters),
+        )
         decision = self.policy_engine.select_backend_for_category(
             category="model_building",
             state=state,
@@ -340,20 +395,25 @@ class Scheduler:
             preferred_backend=backend_id,
             availability_snapshot=self._selection_availability_snapshot(merged, "model_building"),
         )
+        decision = self._align_model_building_selection_with_action(
+            decision,
+            backend_id=backend_id,
+            action_name=action_name,
+        )
         merged["model_building_selection_decision"] = decision
-        if action.name == ActionName.RUN_EMODELX:
+        if action_name == ActionName.RUN_EMODELX:
             if pf.get("repo_path"):
                 merged.setdefault("emodelx_repo_dir", pf.get("repo_path"))
             if pf.get("python_path"):
                 merged.setdefault("emodelx_python", pf.get("python_path"))
-        if action.name == ActionName.RUN_MICA:
+        if action_name == ActionName.RUN_MICA:
             if pf.get("repo_path"):
                 merged.setdefault("mica_repo_dir", pf.get("repo_path"))
             if pf.get("python_path"):
                 merged.setdefault("mica_python", pf.get("python_path"))
             if pf.get("af3_dir"):
                 merged.setdefault("af3_dir", pf.get("af3_dir"))
-        return action.model_copy(update={"parameters": merged})
+        return action.model_copy(update={"name": action_name, "parameters": merged})
 
     @staticmethod
     def _attach_picking_qc(
@@ -742,58 +802,15 @@ class Scheduler:
         if state.sequence_path:
             merged_params.setdefault("sequence_path", state.sequence_path)
 
-        action_name_str = model_building_backend_to_action_name(mb_resolved)
-        try:
-            new_name = ActionName(action_name_str)
-        except ValueError:
-            new_name = ActionName.RUN_MODELANGELO
-
-        if new_name == ActionName.RUN_EMODELX:
-            merged_params.setdefault("chain_count", merged_params.get("chain_count") or 1)
-            merged_params.setdefault("output_dir", str(Path(state.project_path) / "ModelBuilding" / "EModelX" / "job_agent"))
-            merged_params.setdefault("emodelx_protocol", "temp_free")
-            default_repo = self.base_dir.parent / "EModelX"
-            if default_repo.is_dir():
-                merged_params.setdefault("emodelx_repo_dir", str(default_repo))
-        if new_name == ActionName.RUN_MICA:
-            merged_params.setdefault("chain_count", merged_params.get("chain_count") or 1)
-            merged_params.setdefault("output_dir", str(Path(state.project_path) / "ModelBuilding" / "MICA" / "job_agent"))
-            merged_params.setdefault("protocol", "AF3_struct")
-            default_repo = self.base_dir.parent / "MICA"
-            if default_repo.is_dir():
-                merged_params.setdefault("mica_repo_dir", str(default_repo))
-
         raw_af3 = getattr(ctx, "af3_dir", None)
         if raw_af3 is not None and str(raw_af3).strip():
             merged_params.setdefault("af3_dir", str(raw_af3).strip())
 
-        pf = preflight_model_building(
-            mb_resolved,
-            merged_params,
-            modelangelo_config_path=(self.config_dir / "model_builders.yaml") if mb_resolved == "modelangelo" else None,
-            emodelx_config_path=(self.config_dir / "emodelx.yaml") if mb_resolved == "emodelx" else None,
-            mica_config_path=(self.config_dir / "mica.yaml") if mb_resolved == "mica" else None,
+        new_name, merged_params, pf = self._prepare_model_building_backend(
+            state=state,
+            backend_id=mb_resolved,
+            params=merged_params,
         )
-        merged_params["model_building_preflight"] = pf
-        if mb_resolved == "emodelx":
-            merged_params["emodelx_preflight"] = pf
-            if pf.get("repo_path"):
-                merged_params.setdefault("emodelx_repo_dir", pf.get("repo_path"))
-            if pf.get("python_path"):
-                merged_params.setdefault("emodelx_python", pf.get("python_path"))
-        if mb_resolved == "mica":
-            merged_params["mica_preflight"] = pf
-            if pf.get("repo_path"):
-                merged_params.setdefault("mica_repo_dir", pf.get("repo_path"))
-            if pf.get("python_path"):
-                merged_params.setdefault("mica_python", pf.get("python_path"))
-            if pf.get("af3_dir"):
-                merged_params.setdefault("af3_dir", pf.get("af3_dir"))
-        merged_params["model_building_availability"] = "available" if pf.get("available") else "unavailable"
-        merged_params["model_building_execution_mode"] = str(pf.get("execution_mode") or "unavailable")
-        merged_params["model_building_blocked_reason"] = pf.get("blocked_reason") or ""
-        merged_params["model_building_missing_inputs"] = list(pf.get("missing_inputs") or [])
-        merged_params["model_building_missing_dependencies"] = list(pf.get("missing_dependencies") or [])
         decision = self.policy_engine.select_backend_for_category(
             category="model_building",
             state=state,
@@ -801,9 +818,15 @@ class Scheduler:
             preferred_backend=preferred,
             availability_snapshot=self._selection_availability_snapshot(merged_params, "model_building"),
         )
+        decision = self._align_model_building_selection_with_action(
+            decision,
+            backend_id=mb_resolved,
+            action_name=new_name,
+        )
         merged_params["model_building_selection_decision"] = decision
 
         priorities = self.structure_router.rules.get("priorities", {})
+        action_name_str = model_building_backend_to_action_name(mb_resolved)
         new_priority = int(priorities.get(action_name_str, routed.priority))
 
         reason = routed.reason
