@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import shlex
 import subprocess
 import time
@@ -159,6 +160,20 @@ def _write_coord_star(path: Path, coords: List[Tuple[float, float]]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _write_converted_coord(
+    path: Path,
+    micrograph_id: str,
+    rows: List[Tuple[float, float, Optional[float]]],
+) -> None:
+    """Write image_name x_coord y_coord score converted coord file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = []
+    for x, y, fom in rows:
+        score = f"{fom:.6f}" if fom is not None else "0.000000"
+        lines.append(f"{micrograph_id} {x:.2f} {y:.2f} {score}")
+    path.write_text("\n".join(lines) + "\n" if lines else "", encoding="utf-8")
+
+
 def _write_simple_coord(path: Path, coords: List[Tuple[float, float]]) -> None:
     """Write a plain ``x y`` coord file for the F1 evaluator."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -171,15 +186,21 @@ def _write_simple_coord(path: Path, coords: List[Tuple[float, float]]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _parse_relion_coord_star(path: Path) -> List[Tuple[float, float]]:
-    """Parse a per-micrograph coordinate STAR file produced by relion_autopick."""
+def _parse_relion_coord_star(
+    path: Path,
+) -> List[Tuple[float, float, Optional[float]]]:
+    """Parse a per-micrograph coordinate STAR file produced by relion_autopick.
+
+    Returns list of (x, y, fom) tuples where fom may be None when
+    _rlnAutopickFigureOfMerit is absent.
+    """
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return []
     in_loop = False
-    x_idx = y_idx = None
-    coords: List[Tuple[float, float]] = []
+    x_idx = y_idx = fom_idx = None
+    coords: List[Tuple[float, float, Optional[float]]] = []
     columns: List[str] = []
     data_start = False
     for line in text.splitlines():
@@ -200,14 +221,39 @@ def _parse_relion_coord_star(path: Path) -> List[Tuple[float, float]]:
             data_start = True
             x_idx = next((i for i, c in enumerate(columns) if "coordinatex" in c), None)
             y_idx = next((i for i, c in enumerate(columns) if "coordinatey" in c), None)
+            fom_idx = next(
+                (i for i, c in enumerate(columns) if "autopickfigureofmerit" in c),
+                None,
+            )
         if data_start and x_idx is not None and y_idx is not None:
             parts = s.split()
             if len(parts) > max(x_idx, y_idx):
                 try:
-                    coords.append((float(parts[x_idx]), float(parts[y_idx])))
+                    fom: Optional[float] = None
+                    if fom_idx is not None and len(parts) > fom_idx:
+                        try:
+                            fom = float(parts[fom_idx])
+                        except ValueError:
+                            pass
+                    coords.append((float(parts[x_idx]), float(parts[y_idx]), fom))
                 except ValueError:
                     continue
     return coords
+
+
+def _find_autopick_star_files(autopick_job_dir: Path) -> List[Path]:
+    """Find all *_autopick.star files under AutoPick/job001/ recursively."""
+    return sorted(autopick_job_dir.rglob("*_autopick.star"))
+
+
+def _extract_stdout_particle_count(stdout: str) -> Optional[int]:
+    """Parse 'Total number of particles from N micrographs = K' from stdout."""
+    if not stdout:
+        return None
+    m = re.search(r"Total number of particles.*?=\s*(\d+)", stdout)
+    if m:
+        return int(m.group(1))
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -475,18 +521,70 @@ def run_relion_log_autopick(
 
     # --- Collect predicted coordinates per micrograph -----------------------
     pred_coord_path = out / "all_predicted_coords.coord"
+    converted_coords_dir = out / "converted_coords"
     all_preds: List[Tuple[float, float]] = []
+    parse_diagnostics: Dict[str, Any] = {
+        "n_autopick_star_files_found": 0,
+        "n_coordinate_rows_parsed": 0,
+        "coordinate_files": [],
+        "skipped_files": [],
+        "first_parsed_file": None,
+        "first_parsed_rows": [],
+    }
+    parser_warning: Optional[str] = None
 
     if not config.dry_run and run_error is None and returncode == 0:
-        for p in pairs:
-            stem = Path(p["micrograph_path"]).stem
-            # relion_autopick writes <stem>_autopick.star into the odir
-            star_path = autopick_dir / f"{stem}_autopick.star"
-            coords = _parse_relion_coord_star(star_path)
-            all_preds.extend(coords)
+        star_files = _find_autopick_star_files(autopick_dir)
+        parse_diagnostics["n_autopick_star_files_found"] = len(star_files)
+
+        for star_path in star_files:
+            rows = _parse_relion_coord_star(star_path)
+            if not rows:
+                parse_diagnostics["skipped_files"].append(str(star_path))
+                continue
+
+            # Derive micrograph_id from star filename: strip _autopick.star suffix
+            mic_id = star_path.name
+            if mic_id.endswith("_autopick.star"):
+                mic_id = mic_id[: -len("_autopick.star")]
+
+            # Diagnostics for first parsed file
+            if parse_diagnostics["first_parsed_file"] is None:
+                parse_diagnostics["first_parsed_file"] = str(star_path)
+                parse_diagnostics["first_parsed_rows"] = [
+                    {"x": r[0], "y": r[1], "fom": r[2]} for r in rows[:5]
+                ]
+
+            # Write per-micrograph converted coord file
+            conv_path = converted_coords_dir / f"{mic_id}.coord"
+            _write_converted_coord(conv_path, mic_id, rows)
+            parse_diagnostics["coordinate_files"].append(str(conv_path))
+
+            all_preds.extend((r[0], r[1]) for r in rows)
+
+        parse_diagnostics["n_coordinate_rows_parsed"] = len(all_preds)
+
+        # Warn if RELION reported picks but parser found none
+        stdout_count = _extract_stdout_particle_count(stdout_text or "")
+        if len(all_preds) == 0 and (
+            (stdout_count is not None and stdout_count > 0)
+            or parse_diagnostics["n_autopick_star_files_found"] > 0
+        ):
+            parser_warning = (
+                f"RELION returncode=0 and stdout reports "
+                f"{stdout_count} particles across "
+                f"{parse_diagnostics['n_autopick_star_files_found']} STAR files, "
+                f"but coordinate parser found 0 rows. "
+                f"Check AutoPick/job001/ subdirectory structure."
+            )
     # dry_run or failed run → all_preds stays empty (STOP preserved)
 
     _write_simple_coord(pred_coord_path, all_preds)
+
+    # Persist parse diagnostics
+    (out / "relion_output_parse_diagnostics.json").write_text(
+        json.dumps(parse_diagnostics, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
     # --- Collect GT coordinate files ----------------------------------------
     gt_files: List[Path] = []
@@ -524,6 +622,7 @@ def run_relion_log_autopick(
         "n_micrographs": len(pairs),
         "evaluation_available": bool(eval_result.get("evaluation_available")),
         "error": run_error,
+        "parser_warning": parser_warning,
     }
 
     # --- Persist bundle ------------------------------------------------------

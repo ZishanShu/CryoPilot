@@ -18,9 +18,12 @@ import pytest
 from agent.relion_log_autopick_runner import (
     RelionLogAutopickConfig,
     _build_autopick_cmd,
+    _extract_stdout_particle_count,
+    _find_autopick_star_files,
     _parse_relion_coord_star,
     _read_pairs_csv,
     _write_coord_star,
+    _write_converted_coord,
     _write_micrographs_star,
     _write_simple_coord,
     run_relion_log_autopick,
@@ -106,9 +109,10 @@ def test_write_and_parse_coord_star_round_trip(tmp_path):
     _write_coord_star(star_path, coords)
     parsed = _parse_relion_coord_star(star_path)
     assert len(parsed) == len(coords)
-    for (ex, ey), (px, py) in zip(coords, parsed):
+    for (ex, ey), (px, py, fom) in zip(coords, parsed):
         assert abs(ex - px) < 0.01
         assert abs(ey - py) < 0.01
+        assert fom is None  # no FOM column in _write_coord_star output
 
 
 def test_parse_coord_star_missing_file_returns_empty(tmp_path):
@@ -622,3 +626,271 @@ def test_pairs_csv_no_usable_rows_distinct_error(tmp_path):
     assert diag["n_rows_raw"] == 1
     assert diag["n_rows_usable"] == 0
     assert diag["dropped_reasons"]
+
+
+# ---------------------------------------------------------------------------
+# New tests: STAR file glob search, converted_coords, diagnostics, warnings
+# ---------------------------------------------------------------------------
+
+
+def _write_relion_autopick_star(
+    path: Path,
+    coords: List[Tuple[float, float]],
+    include_fom: bool = False,
+) -> Path:
+    """Write a synthetic RELION *_autopick.star file with _rlnCoordinateX/Y."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if include_fom:
+        lines = [
+            "data_", "", "loop_",
+            "_rlnCoordinateX #1",
+            "_rlnCoordinateY #2",
+            "_rlnAutopickFigureOfMerit #3",
+        ]
+        for i, (x, y) in enumerate(coords):
+            lines.append(f"{x:.2f} {y:.2f} {0.5 + i * 0.01:.4f}")
+    else:
+        lines = ["data_", "", "loop_", "_rlnCoordinateX #1", "_rlnCoordinateY #2"]
+        for x, y in coords:
+            lines.append(f"{x:.2f} {y:.2f}")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def test_parse_relion_autopick_star_xy_only(tmp_path):
+    """Parse a STAR file with _rlnCoordinateX/_rlnCoordinateY only."""
+    coords = [(123.4, 567.8), (200.0, 300.0)]
+    star = _write_relion_autopick_star(tmp_path / "mic001_autopick.star", coords)
+    parsed = _parse_relion_coord_star(star)
+    assert len(parsed) == 2
+    assert abs(parsed[0][0] - 123.4) < 0.01
+    assert abs(parsed[0][1] - 567.8) < 0.01
+    assert parsed[0][2] is None
+
+
+def test_parse_relion_autopick_star_with_fom(tmp_path):
+    """Parse a STAR file that includes _rlnAutopickFigureOfMerit."""
+    coords = [(10.0, 20.0), (30.0, 40.0)]
+    star = _write_relion_autopick_star(
+        tmp_path / "mic001_autopick.star", coords, include_fom=True
+    )
+    parsed = _parse_relion_coord_star(star)
+    assert len(parsed) == 2
+    assert parsed[0][2] is not None
+    assert abs(parsed[0][2] - 0.5) < 0.01
+    assert parsed[1][2] is not None
+
+
+def test_find_autopick_star_files_recursive(tmp_path):
+    """_find_autopick_star_files finds stars in subdirectories."""
+    sub = tmp_path / "Micrographs"
+    sub.mkdir()
+    f1 = _write_relion_autopick_star(tmp_path / "mic001_autopick.star", [(1, 2)])
+    f2 = _write_relion_autopick_star(sub / "mic002_autopick.star", [(3, 4)])
+    (tmp_path / "other.star").write_text("data_\n")  # should be ignored
+    found = _find_autopick_star_files(tmp_path)
+    assert f1 in found
+    assert f2 in found
+    assert len(found) == 2
+
+
+def test_write_converted_coord(tmp_path):
+    """_write_converted_coord writes image_name x y score lines."""
+    rows = [(100.0, 200.0, 0.75), (300.0, 400.0, None)]
+    out = tmp_path / "mic001.coord"
+    _write_converted_coord(out, "mic001", rows)
+    lines = [l for l in out.read_text().splitlines() if l]
+    assert lines[0].startswith("mic001 ")
+    parts0 = lines[0].split()
+    assert parts0[0] == "mic001"
+    assert abs(float(parts0[1]) - 100.0) < 0.01
+    assert abs(float(parts0[2]) - 200.0) < 0.01
+    assert abs(float(parts0[3]) - 0.75) < 0.001
+    # None fom → 0.000000
+    parts1 = lines[1].split()
+    assert abs(float(parts1[3]) - 0.0) < 0.001
+
+
+def test_extract_stdout_particle_count():
+    """_extract_stdout_particle_count parses RELION stdout correctly."""
+    stdout = (
+        "Processing micrograph 1...\n"
+        "Total number of particles from 10 micrographs = 10259\n"
+        "Done!\n"
+    )
+    assert _extract_stdout_particle_count(stdout) == 10259
+    assert _extract_stdout_particle_count("") is None
+    assert _extract_stdout_particle_count("no match here") is None
+
+
+def _mock_runner_with_picks_in_subdir(
+    job_dir: Path,
+    picks_per_mic: dict,
+    stdout: str = "",
+) -> object:
+    """Runner that writes autopick STAR files into a Micrographs/ subdirectory."""
+
+    def runner(cmd: List[str], cwd: Path) -> Tuple[int, str, str]:
+        odir = None
+        for i, tok in enumerate(cmd):
+            if tok == "--odir" and i + 1 < len(cmd):
+                odir = Path(cmd[i + 1])
+                break
+        if odir is None:
+            odir = job_dir
+        sub = odir / "Micrographs"
+        sub.mkdir(parents=True, exist_ok=True)
+        for stem, coords in picks_per_mic.items():
+            _write_relion_autopick_star(sub / f"{stem}_autopick.star", coords)
+        return 0, stdout, ""
+
+    return runner
+
+
+def test_real_run_finds_stars_in_subdirectory(tmp_path):
+    """Parser must find *_autopick.star in AutoPick/job001/Micrographs/."""
+    gt_coords = [(100.0 + i * 50, 200.0 + i * 50) for i in range(5)]
+    gt_path = _make_gt_coord(tmp_path / "gt" / "mic001.coord", gt_coords)
+    pairs_csv = _make_pairs_csv(
+        tmp_path / "pairs.csv",
+        [(str(tmp_path / "Micrographs" / "mic001.mrc"), str(gt_path))],
+    )
+    stdout = "Total number of particles from 1 micrographs = 5\n"
+    mock_runner = _mock_runner_with_picks_in_subdir(
+        tmp_path / "out" / "AutoPick" / "job001",
+        {"mic001": gt_coords},
+        stdout=stdout,
+    )
+    cfg = RelionLogAutopickConfig(
+        relion_autopick_bin=tmp_path / "relion_autopick",
+        output_root=tmp_path / "out",
+        pairs_csv=pairs_csv,
+        dry_run=False,
+        match_radius_px=80.0,
+        command_runner=mock_runner,
+    )
+    bundle = run_relion_log_autopick(cfg)
+    assert bundle["predicted_count"] == len(gt_coords), (
+        f"Expected {len(gt_coords)} predictions, got {bundle['predicted_count']}"
+    )
+    assert bundle["f1"] is not None and bundle["f1"] > 0.9
+    assert bundle.get("parser_warning") is None
+
+
+def test_parse_diagnostics_json_written(tmp_path):
+    """relion_output_parse_diagnostics.json is always written after a real run."""
+    gt_coords = [(100.0, 200.0), (300.0, 400.0)]
+    gt_path = _make_gt_coord(tmp_path / "gt" / "mic001.coord", gt_coords)
+    pairs_csv = _make_pairs_csv(
+        tmp_path / "pairs.csv",
+        [(str(tmp_path / "Micrographs" / "mic001.mrc"), str(gt_path))],
+    )
+    mock_runner = _mock_runner_with_picks(
+        tmp_path / "out" / "AutoPick" / "job001", {"mic001": gt_coords}
+    )
+    cfg = RelionLogAutopickConfig(
+        relion_autopick_bin=tmp_path / "relion_autopick",
+        output_root=tmp_path / "out",
+        pairs_csv=pairs_csv,
+        dry_run=False,
+        command_runner=mock_runner,
+    )
+    run_relion_log_autopick(cfg)
+    diag_path = tmp_path / "out" / "relion_output_parse_diagnostics.json"
+    assert diag_path.exists()
+    diag = json.loads(diag_path.read_text())
+    assert diag["n_autopick_star_files_found"] >= 1
+    assert diag["n_coordinate_rows_parsed"] == len(gt_coords)
+    assert len(diag["coordinate_files"]) >= 1
+    assert diag["first_parsed_file"] is not None
+    assert len(diag["first_parsed_rows"]) > 0
+
+
+def test_converted_coords_written_per_micrograph(tmp_path):
+    """converted_coords/<mic_id>.coord is written for each parsed micrograph."""
+    coords_a = [(10.0, 20.0), (30.0, 40.0)]
+    coords_b = [(50.0, 60.0)]
+    gt_a = _make_gt_coord(tmp_path / "gt" / "micA.coord", coords_a)
+    gt_b = _make_gt_coord(tmp_path / "gt" / "micB.coord", coords_b)
+    pairs_csv = _make_pairs_csv(
+        tmp_path / "pairs.csv",
+        [
+            (str(tmp_path / "Micrographs" / "micA.mrc"), str(gt_a)),
+            (str(tmp_path / "Micrographs" / "micB.mrc"), str(gt_b)),
+        ],
+    )
+    autopick_dir = tmp_path / "out" / "AutoPick" / "job001"
+    mock_runner = _mock_runner_with_picks(
+        autopick_dir, {"micA": coords_a, "micB": coords_b}
+    )
+    cfg = RelionLogAutopickConfig(
+        relion_autopick_bin=tmp_path / "relion_autopick",
+        output_root=tmp_path / "out",
+        pairs_csv=pairs_csv,
+        dry_run=False,
+        command_runner=mock_runner,
+    )
+    run_relion_log_autopick(cfg)
+    conv_dir = tmp_path / "out" / "converted_coords"
+    assert (conv_dir / "micA.coord").exists()
+    assert (conv_dir / "micB.coord").exists()
+    lines_a = [l for l in (conv_dir / "micA.coord").read_text().splitlines() if l]
+    assert len(lines_a) == len(coords_a)
+    assert lines_a[0].startswith("micA ")
+
+
+def test_predicted_count_equals_parsed_rows(tmp_path):
+    """predicted_count in bundle must equal the number of rows in all_predicted_coords.coord."""
+    n_picks = 7
+    coords = [(float(i * 10), float(i * 20)) for i in range(n_picks)]
+    gt_path = _make_gt_coord(tmp_path / "gt" / "mic001.coord", coords)
+    pairs_csv = _make_pairs_csv(
+        tmp_path / "pairs.csv",
+        [(str(tmp_path / "Micrographs" / "mic001.mrc"), str(gt_path))],
+    )
+    autopick_dir = tmp_path / "out" / "AutoPick" / "job001"
+    mock_runner = _mock_runner_with_picks(autopick_dir, {"mic001": coords})
+    cfg = RelionLogAutopickConfig(
+        relion_autopick_bin=tmp_path / "relion_autopick",
+        output_root=tmp_path / "out",
+        pairs_csv=pairs_csv,
+        dry_run=False,
+        command_runner=mock_runner,
+    )
+    bundle = run_relion_log_autopick(cfg)
+    pred_file = tmp_path / "out" / "all_predicted_coords.coord"
+    file_rows = [l for l in pred_file.read_text().splitlines() if l.strip()]
+    assert bundle["predicted_count"] == n_picks
+    assert len(file_rows) == n_picks
+
+
+def test_parser_warning_emitted_when_stdout_reports_picks_but_parser_finds_zero(tmp_path):
+    """parser_warning is set when returncode=0 + stdout has particles but parser finds 0."""
+    pairs_csv = _make_pairs_csv(
+        tmp_path / "pairs.csv",
+        [(str(tmp_path / "Micrographs" / "mic001.mrc"), "")],
+    )
+    stdout_with_picks = "Total number of particles from 1 micrographs = 500\n"
+
+    def runner_returns_zero_stars(cmd, cwd):
+        # Writes no STAR files; RELION stdout claims 500 picks
+        odir = None
+        for i, tok in enumerate(cmd):
+            if tok == "--odir" and i + 1 < len(cmd):
+                odir = Path(cmd[i + 1])
+                break
+        if odir:
+            odir.mkdir(parents=True, exist_ok=True)
+        return 0, stdout_with_picks, ""
+
+    cfg = RelionLogAutopickConfig(
+        relion_autopick_bin=tmp_path / "relion_autopick",
+        output_root=tmp_path / "out",
+        pairs_csv=pairs_csv,
+        dry_run=False,
+        command_runner=runner_returns_zero_stars,
+    )
+    bundle = run_relion_log_autopick(cfg)
+    assert bundle["predicted_count"] == 0
+    assert bundle["parser_warning"] is not None
+    assert "500" in bundle["parser_warning"] or "returncode=0" in bundle["parser_warning"]
