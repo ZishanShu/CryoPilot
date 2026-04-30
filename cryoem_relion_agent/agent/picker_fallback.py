@@ -17,7 +17,7 @@ import json
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 
 # Fixed retrieval order.  Anything new must be appended here AND given an
@@ -38,6 +38,14 @@ STATUS_UNAVAILABLE = "unavailable"
 FINAL_ACTION_RUN = "RUN_ALTERNATIVE_PICKER"
 FINAL_ACTION_PLAN_ONLY = "PLAN_ONLY_ALTERNATIVE_PICKER"
 FINAL_ACTION_STOP = "STOP_PLAN_ONLY_NO_VIABLE_PICKER"
+
+# Lazy import so that the runner is only needed when relion is actually selected.
+def _import_runner() -> Any:
+    from agent.relion_log_autopick_runner import (  # noqa: PLC0415
+        RelionLogAutopickConfig,
+        run_relion_log_autopick,
+    )
+    return RelionLogAutopickConfig, run_relion_log_autopick
 
 
 @dataclass
@@ -303,7 +311,11 @@ def _rerun_plan_md(plan: Dict[str, Any]) -> str:
 
 
 def _comparison_rows(
-    evidence: Dict[str, Any], candidates: List[Dict[str, Any]], selection: Dict[str, Any]
+    evidence: Dict[str, Any],
+    candidates: List[Dict[str, Any]],
+    selection: Dict[str, Any],
+    *,
+    relion_rerun: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """One row for the failed Topaz baseline plus one row per candidate."""
     selected_name = selection.get("selected")
@@ -320,12 +332,16 @@ def _comparison_rows(
         }
     )
     for c in candidates:
+        # If we ran RELION and have an actual F1 for it, surface that.
+        best_f1 = None
+        if c["name"] == "relion_log_autopick" and relion_rerun is not None:
+            best_f1 = relion_rerun.get("f1")
         rows.append(
             {
                 "model": c["name"],
                 "kind": c.get("kind", ""),
                 "status": c["status"],
-                "best_f1": None,
+                "best_f1": best_f1,
                 "qc_threshold_f1": evidence.get("qc_threshold_f1"),
                 "selected": c["name"] == selected_name,
                 "notes": c.get("notes", ""),
@@ -359,6 +375,7 @@ def _final_selection_md(final: Dict[str, Any]) -> str:
         f"- previous_backend: {final.get('previous_backend')}",
         f"- previous_micro_f1: {final.get('previous_micro_f1')}",
         f"- qc_threshold_f1: {final.get('qc_threshold_f1')}",
+        f"- relion_log_f1: {final.get('relion_log_f1')}",
         "",
         "Note: this stage does not claim full autonomous structure determination.",
     ]
@@ -370,6 +387,8 @@ def _report_md(
     candidates: List[Dict[str, Any]],
     selection: Dict[str, Any],
     final: Dict[str, Any],
+    *,
+    relion_rerun: Optional[Dict[str, Any]] = None,
 ) -> str:
     lines = [
         "# Picker model selection report",
@@ -387,10 +406,29 @@ def _report_md(
         f"- final_action: {selection.get('final_action')}",
         f"- reason: {selection.get('reason')}",
         "",
+        "## Final decision",
+        f"- final_action: {final.get('final_action')}",
+        f"- reason: {final.get('reason')}",
+        f"- relion_log_f1: {final.get('relion_log_f1')}",
+        "",
+    ]
+    if relion_rerun is not None:
+        lines += [
+            "## RELION LoG autopick run",
+            f"- mode: {relion_rerun.get('mode')}",
+            f"- f1: {relion_rerun.get('f1')}",
+            f"- predicted_count: {relion_rerun.get('predicted_count')}",
+            f"- gt_count: {relion_rerun.get('gt_count')}",
+            f"- returncode: {relion_rerun.get('returncode')}",
+            f"- error: {relion_rerun.get('error')}",
+            "",
+        ]
+    lines += [
         "## Notes",
         "- Rule-based baseline behavior is unchanged by this stage.",
         "- crYOLO unavailability is non-fatal.",
         "- CryoTransformer is plan-only unless an inference smoke run is verified.",
+        "- Scientific STOP is preserved when best F1 < qc_threshold.",
         "- This stage does not claim full autonomous structure determination.",
     ]
     return "\n".join(lines) + "\n"
@@ -403,8 +441,32 @@ def run_picker_fallback_stage(
     evidence: Dict[str, Any],
     paths: BackendPaths,
     output_dir: Path,
+    *,
+    relion_run_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Run the picker fallback / model-selection stage and persist all artifacts.
+
+    Parameters
+    ----------
+    evidence:
+        Dict produced by the Topaz QC gate (must contain ``picking_qc_passed``,
+        ``selected_micro_f1``, ``qc_threshold_f1``, etc.).
+    paths:
+        ``BackendPaths`` instance for availability detection.
+    output_dir:
+        Root directory for all artifacts.
+    relion_run_config:
+        Optional dict passed to ``RelionLogAutopickConfig`` when
+        ``relion_log_autopick`` is the selected candidate and
+        ``final_action == FINAL_ACTION_RUN``.  Supported keys:
+
+        - ``pairs_csv`` (str | Path, required for real run)
+        - ``dry_run`` (bool, default True)
+        - ``limit`` (int, optional)
+        - ``particle_diameter_angstrom`` (float, default 120)
+        - ``pixel_size_angstrom`` (float, default 1.0)
+        - ``match_radius_px`` (float, default 80)
+        - ``command_runner`` (callable, for test mocking)
 
     Returns the in-memory bundle (also persisted to ``output_dir``).
     """
@@ -417,20 +479,83 @@ def run_picker_fallback_stage(
         _write_json(Path(output_dir) / "picker_model_selection_skipped.json", bundle)
         return bundle
 
+    out = Path(output_dir)
     candidates = retrieve_alternative_picker_candidates(paths)
     selection = select_alternative_picker(candidates)
     plan = _rerun_plan(selection, evidence)
-    rows = _comparison_rows(evidence, candidates, selection)
+
+    # ---- Optionally execute RELION LoG autopick and evaluate F1 ------------
+    relion_rerun: Optional[Dict[str, Any]] = None
+    if (
+        selection.get("selected") == "relion_log_autopick"
+        and selection.get("final_action") == FINAL_ACTION_RUN
+    ):
+        RelionLogAutopickConfig, run_relion_log_autopick = _import_runner()
+        cfg_kwargs: Dict[str, Any] = {
+            "output_root": out / "reruns" / "relion_log_autopick",
+            "dry_run": True,
+        }
+        if relion_run_config:
+            for k in (
+                "pairs_csv",
+                "dry_run",
+                "limit",
+                "particle_diameter_angstrom",
+                "pixel_size_angstrom",
+                "voltage_kv",
+                "cs_mm",
+                "amplitude_contrast",
+                "match_radius_px",
+                "command_runner",
+            ):
+                if k in relion_run_config:
+                    cfg_kwargs[k] = relion_run_config[k]
+        if paths.relion_autopick is not None:
+            cfg_kwargs["relion_autopick_bin"] = paths.relion_autopick
+        cfg = RelionLogAutopickConfig(**cfg_kwargs)
+        relion_rerun = run_relion_log_autopick(cfg)
+
+    # ---- Build comparison rows, updating RELION F1 if available ------------
+    rows = _comparison_rows(evidence, candidates, selection, relion_rerun=relion_rerun)
+
+    # ---- Determine final F1 and STOP preservation --------------------------
+    qc_threshold = evidence.get("qc_threshold_f1", 0.2)
+    relion_f1 = relion_rerun.get("f1") if relion_rerun else None
+    best_alternative_f1 = relion_f1  # extend here when other runners are added
+
+    if best_alternative_f1 is not None and best_alternative_f1 >= qc_threshold:
+        final_action_resolved = FINAL_ACTION_RUN
+        final_reason = (
+            f"relion_log_autopick F1={best_alternative_f1:.4f} >= "
+            f"qc_threshold={qc_threshold}; proceed."
+        )
+    elif selection.get("final_action") == FINAL_ACTION_STOP:
+        final_action_resolved = FINAL_ACTION_STOP
+        final_reason = selection.get("reason", "No viable picker available.")
+    else:
+        # Runner was run but F1 still below threshold → preserve STOP
+        final_action_resolved = FINAL_ACTION_STOP if (
+            relion_rerun is not None
+            and (relion_f1 is None or relion_f1 < qc_threshold)
+        ) else selection.get("final_action", FINAL_ACTION_STOP)
+        final_reason = (
+            f"Best alternative F1={best_alternative_f1} is below "
+            f"qc_threshold={qc_threshold}; scientific STOP preserved."
+            if relion_rerun is not None
+            else selection.get("reason", "")
+        )
+
     final = {
         "selected": selection.get("selected"),
-        "final_action": selection.get("final_action"),
-        "reason": selection.get("reason"),
+        "final_action": final_action_resolved,
+        "reason": final_reason,
         "previous_backend": evidence.get("selected_for_backend_execution"),
         "previous_micro_f1": evidence.get("selected_micro_f1"),
-        "qc_threshold_f1": evidence.get("qc_threshold_f1"),
+        "qc_threshold_f1": qc_threshold,
+        "relion_log_f1": relion_f1,
     }
 
-    out = Path(output_dir)
+    # ---- Write artifacts ----------------------------------------------------
     _write_json(out / "retrieval" / "alternative_picker_candidates.json", candidates)
     _write_text(out / "retrieval" / "alternative_picker_candidates.md", _candidates_md(candidates))
     _write_json(out / "selection" / "alternative_picker_rerun_plan.json", plan)
@@ -449,7 +574,7 @@ def run_picker_fallback_stage(
     _write_text(out / "comparison" / "final_picker_selection.md", _final_selection_md(final))
     _write_text(
         out / "picker_model_selection_report.md",
-        _report_md(evidence, candidates, selection, final),
+        _report_md(evidence, candidates, selection, final, relion_rerun=relion_rerun),
     )
 
     return {
@@ -458,5 +583,6 @@ def run_picker_fallback_stage(
         "plan": plan,
         "comparison_rows": rows,
         "final": final,
+        "relion_rerun": relion_rerun,
         "output_dir": str(out),
     }

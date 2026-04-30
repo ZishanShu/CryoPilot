@@ -22,8 +22,22 @@
 - final_action: RUN_ALTERNATIVE_PICKER
 - reason: Selected relion_log_autopick (available) per priority order.
 
+## Final decision
+- final_action: STOP_PLAN_ONLY_NO_VIABLE_PICKER
+- reason: Best alternative F1=0.0 is below qc_threshold=0.2; scientific STOP preserved.
+- relion_log_f1: 0.0
+
+## RELION LoG autopick run
+- mode: dry_run
+- f1: 0.0
+- predicted_count: 0
+- gt_count: 24
+- returncode: None
+- error: None
+
 ## Notes
 - Rule-based baseline behavior is unchanged by this stage.
 - crYOLO unavailability is non-fatal.
 - CryoTransformer is plan-only unless an inference smoke run is verified.
+- Scientific STOP is preserved when best F1 < qc_threshold.
 - This stage does not claim full autonomous structure determination.
