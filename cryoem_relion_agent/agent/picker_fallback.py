@@ -45,6 +45,12 @@ class BackendPaths:
     """Filesystem locations used for availability detection.
 
     All fields are optional; missing paths are treated as unavailable.
+
+    ``allow_system_path`` controls whether detectors may fall back to
+    ``shutil.which`` when an explicit path is not supplied.  Set to
+    ``False`` (the default) for unit tests so real system PATH binaries
+    cannot leak into results.  Pass ``True`` in real CLI / production
+    environments where implicit PATH discovery is desired.
     """
 
     relion_autopick: Optional[Path] = None
@@ -54,8 +60,11 @@ class BackendPaths:
     cryotransformer_repo: Optional[Path] = None
     template_picker_script: Optional[Path] = None
     gt_coords_dir: Optional[Path] = None  # for topaz supervised retrain
+    allow_system_path: bool = False
 
     def _which(self, name: str) -> Optional[Path]:
+        if not self.allow_system_path:
+            return None
         found = shutil.which(name)
         return Path(found) if found else None
 
