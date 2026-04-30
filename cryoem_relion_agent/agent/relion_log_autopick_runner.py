@@ -242,9 +242,55 @@ def _parse_relion_coord_star(
 
 
 def _find_autopick_star_files(autopick_job_dir: Path) -> List[Path]:
-    """Find all *_autopick.star files under AutoPick/job001/ recursively."""
-    return sorted(autopick_job_dir.rglob("*_autopick.star"))
+    """Find RELION per-micrograph autopick STAR files.
 
+    RELION may write two layouts depending on how --odir is rendered.
+
+    Directory-style layout:
+        AutoPick/job001/Micrographs/*_autopick.star
+
+    Prefix-style layout:
+        AutoPick/job001Micrographs/*_autopick.star
+
+    The prefix-style layout appears when --odir is passed as AutoPick/job001
+    without a trailing slash.
+    """
+    found: List[Path] = []
+    seen = set()
+
+    def add(paths):
+        for q in paths:
+            q = Path(q)
+            if not q.is_file():
+                continue
+            if not q.name.endswith("_autopick.star"):
+                continue
+            key = str(q.resolve())
+            if key in seen:
+                continue
+            seen.add(key)
+            found.append(q)
+
+    # Layout A: AutoPick/job001/Micrographs/*_autopick.star
+    # Also supports simple test fixtures where autopick_job_dir itself
+    # contains *_autopick.star or subdirectories with *_autopick.star.
+    if autopick_job_dir.exists():
+        add(autopick_job_dir.rglob("*_autopick.star"))
+
+    # Layout B: AutoPick/job001Micrographs/*_autopick.star
+    prefix_micrographs = autopick_job_dir.parent / f"{autopick_job_dir.name}Micrographs"
+    if prefix_micrographs.exists():
+        add(prefix_micrographs.rglob("*_autopick.star"))
+
+    # Final fallback for real RELION AutoPick roots only.
+    # Do NOT search autopick_job_dir.parent blindly in tests, because pytest
+    # creates many sibling temp directories that may contain unrelated
+    # *_autopick.star files.
+    autopick_root = autopick_job_dir.parent
+    if autopick_root.name == "AutoPick" and autopick_root.exists():
+        add(autopick_root.rglob("*_autopick.star"))
+
+    return sorted(found)
 
 def _extract_stdout_particle_count(stdout: str) -> Optional[int]:
     """Parse 'Total number of particles from N micrographs = K' from stdout."""
