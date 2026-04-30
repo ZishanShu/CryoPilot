@@ -1,0 +1,18 @@
+{
+  "selected_for_backend_execution": "topaz_t-4",
+  "selected_backend": "topaz",
+  "selected_strategy_id": "topaz_threshold_sweep",
+  "selected_config": "threshold=-4",
+  "selected_threshold": "-4",
+  "selection_metric": "picking_micro_f1",
+  "selected_micro_precision": 0.091939,
+  "selected_micro_recall": 0.019259,
+  "selected_micro_f1": 0.031848,
+  "qc_threshold_f1": 0.2,
+  "picking_qc_passed": false,
+  "selected_for_scientific_downstream": null,
+  "accepted_for_scientific_downstream": false,
+  "final_action": "FALLBACK_TO_ALTERNATIVE_PICKER_OR_RETRAIN",
+  "reason": "Selected topaz_t-4 as the best Topaz threshold-sweep configuration by micro-F1=0.031848, but this remains below QC threshold 0.200000. Preserve scientific STOP gate and retrieve another particle-picking fallback.",
+  "n_qc_candidates": 6
+}
