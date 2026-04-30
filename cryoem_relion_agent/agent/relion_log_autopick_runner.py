@@ -215,25 +215,111 @@ def _parse_relion_coord_star(path: Path) -> List[Tuple[float, float]]:
 # ---------------------------------------------------------------------------
 
 
+# Column-name aliases.  Order matters: earlier names take priority.
+_MIC_ID_KEYS = (
+    "micrograph_id",
+    "image_name",
+    "micrograph_name",
+    "micrograph",
+    "id",
+)
+_MIC_PATH_KEYS = (
+    "local_mrc_path",
+    "mrc_path",
+    "micrograph_path",
+    "local_micrograph_path",
+    "image_path",
+    "path",
+)
+_GT_PATH_KEYS = (
+    "local_coord_path",
+    "gt_coord_path",
+    "gt_path",
+    "coord_path",
+    "ground_truth_coord_path",
+    "gt_coordinate_path",
+    "manual_coord_path",
+)
+
+
+def _pick_field(row: Dict[str, str], keys: Tuple[str, ...]) -> str:
+    """Return the first non-empty value among ``keys`` (case-insensitive)."""
+    lower = {k.lower(): v for k, v in row.items() if k}
+    for key in keys:
+        v = lower.get(key.lower())
+        if v is not None:
+            s = str(v).strip()
+            if s:
+                return s
+    return ""
+
+
 def _read_pairs_csv(
     path: Path, limit: Optional[int] = None
-) -> List[Dict[str, str]]:
-    """Read the pairs CSV (micrograph_path, gt_coord_path)."""
-    pairs: List[Dict[str, str]] = []
+) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
+    """Read a flexible pairs CSV with column aliasing.
+
+    Returns ``(usable_pairs, diagnostics)`` where ``diagnostics`` is a JSON-
+    serialisable dict ready to persist as ``pairs_csv_diagnostics.json``.
+
+    A row is *usable* when both ``micrograph_id`` and a micrograph path are
+    resolvable from the recognised aliases.  GT coords are optional (so dry-run
+    materialisation works without ground-truth files).
+    """
+    usable: List[Dict[str, str]] = []
+    n_raw = 0
+    dropped_reasons: Dict[str, int] = {}
+    fieldnames: List[str] = []
+    first_raw_row: Optional[Dict[str, str]] = None
+    first_usable_row: Optional[Dict[str, str]] = None
+
     with path.open("r", encoding="utf-8", newline="") as fh:
         reader = csv.DictReader(fh)
+        fieldnames = list(reader.fieldnames or [])
         for row in reader:
-            if not row.get("micrograph_path"):
+            n_raw += 1
+            if first_raw_row is None:
+                first_raw_row = {k: row.get(k, "") for k in fieldnames}
+
+            mic_id = _pick_field(row, _MIC_ID_KEYS)
+            mic_path = _pick_field(row, _MIC_PATH_KEYS)
+            gt_path = _pick_field(row, _GT_PATH_KEYS)
+
+            if not mic_id and not mic_path:
+                dropped_reasons["missing_id_and_path"] = (
+                    dropped_reasons.get("missing_id_and_path", 0) + 1
+                )
                 continue
-            pairs.append(
-                {
-                    "micrograph_path": row["micrograph_path"].strip(),
-                    "gt_coord_path": row.get("gt_coord_path", "").strip(),
-                }
-            )
-            if limit is not None and len(pairs) >= limit:
+            if not mic_path:
+                dropped_reasons["missing_micrograph_path"] = (
+                    dropped_reasons.get("missing_micrograph_path", 0) + 1
+                )
+                continue
+            if not mic_id:
+                # Synthesise an id from the path so downstream code has a stem.
+                mic_id = Path(mic_path).stem
+
+            entry = {
+                "micrograph_id": mic_id,
+                "micrograph_path": mic_path,
+                "gt_coord_path": gt_path,
+            }
+            usable.append(entry)
+            if first_usable_row is None:
+                first_usable_row = dict(entry)
+            if limit is not None and len(usable) >= limit:
                 break
-    return pairs
+
+    diagnostics: Dict[str, Any] = {
+        "fieldnames": fieldnames,
+        "n_rows_raw": n_raw,
+        "n_rows_usable": len(usable),
+        "n_rows_dropped": n_raw - len(usable),
+        "dropped_reasons": dropped_reasons,
+        "first_raw_row": first_raw_row,
+        "first_usable_row": first_usable_row,
+    }
+    return usable, diagnostics
 
 
 # ---------------------------------------------------------------------------
@@ -298,12 +384,24 @@ def run_relion_log_autopick(
         return _error_bundle(out, "pairs_csv missing or not found", config.dry_run)
 
     try:
-        pairs = _read_pairs_csv(Path(config.pairs_csv), limit=config.limit)
+        pairs, diagnostics = _read_pairs_csv(Path(config.pairs_csv), limit=config.limit)
     except Exception as exc:  # noqa: BLE001
         return _error_bundle(out, f"pairs_csv read error: {exc}", config.dry_run)
 
-    if not pairs:
+    # Persist diagnostics regardless of whether the parse produced usable rows,
+    # so failures can be debugged from the output bundle alone.
+    (out / "pairs_csv_diagnostics.json").write_text(
+        json.dumps(diagnostics, indent=2, sort_keys=True), encoding="utf-8"
+    )
+
+    if diagnostics["n_rows_raw"] == 0:
         return _error_bundle(out, "pairs_csv is empty", config.dry_run)
+    if diagnostics["n_rows_usable"] == 0:
+        return _error_bundle(
+            out,
+            "pairs_csv has rows but no usable micrograph paths",
+            config.dry_run,
+        )
 
     # --- Materialise project layout -----------------------------------------
     mics_dir = out / "Micrographs"

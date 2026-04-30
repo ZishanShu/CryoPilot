@@ -19,6 +19,7 @@ from agent.relion_log_autopick_runner import (
     RelionLogAutopickConfig,
     _build_autopick_cmd,
     _parse_relion_coord_star,
+    _read_pairs_csv,
     _write_coord_star,
     _write_micrographs_star,
     _write_simple_coord,
@@ -488,3 +489,136 @@ def test_no_relion_runner_called_when_no_relion_available(tmp_path):
     )
     assert bundle["relion_rerun"] is None
     assert bundle["final"]["final_action"] == FINAL_ACTION_STOP
+
+
+# ---------------------------------------------------------------------------
+# Flexible pairs CSV parser
+# ---------------------------------------------------------------------------
+
+
+def _write_csv(path: Path, fieldnames, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fieldnames)
+        writer.writeheader()
+        for r in rows:
+            writer.writerow(r)
+    return path
+
+
+def test_pairs_csv_parses_empiar_columns(tmp_path):
+    """Real EMPIAR-10017 column layout must be parsed without dropping rows."""
+    csv_path = _write_csv(
+        tmp_path / "pairs.csv",
+        [
+            "micrograph_id", "mrc_path", "coord_path",
+            "local_mrc_path", "local_coord_path",
+            "n_gt_particles", "mrc_size_bytes", "coord_exists",
+        ],
+        [
+            {
+                "micrograph_id": "Falcon_2012_06_12-14_33_35_0",
+                "mrc_path": "/data/empiar/Falcon_2012_06_12-14_33_35_0.mrc",
+                "coord_path": "/data/empiar/Falcon_2012_06_12-14_33_35_0.coord",
+                "local_mrc_path": "/runs/input/Falcon_2012_06_12-14_33_35_0.mrc",
+                "local_coord_path": "/runs/input/Falcon_2012_06_12-14_33_35_0.coord",
+                "n_gt_particles": "350",
+                "mrc_size_bytes": "1234",
+                "coord_exists": "True",
+            }
+        ],
+    )
+    pairs, diag = _read_pairs_csv(csv_path)
+    assert diag["n_rows_raw"] == 1
+    assert diag["n_rows_usable"] == 1
+    assert len(pairs) == 1
+    p = pairs[0]
+    assert p["micrograph_id"] == "Falcon_2012_06_12-14_33_35_0"
+    # local_mrc_path takes priority over mrc_path
+    assert p["micrograph_path"].endswith("/runs/input/Falcon_2012_06_12-14_33_35_0.mrc")
+    # local_coord_path takes priority over coord_path
+    assert p["gt_coord_path"].endswith("/runs/input/Falcon_2012_06_12-14_33_35_0.coord")
+
+
+def test_pairs_csv_parses_image_path_gt_path_aliases(tmp_path):
+    """Alias-style CSV: image_path + gt_path must also parse."""
+    csv_path = _write_csv(
+        tmp_path / "pairs.csv",
+        ["image_path", "gt_path"],
+        [
+            {"image_path": "/runs/input/foo.mrc", "gt_path": "/runs/input/foo.coord"},
+            {"image_path": "/runs/input/bar.mrc", "gt_path": ""},
+        ],
+    )
+    pairs, diag = _read_pairs_csv(csv_path)
+    assert diag["n_rows_raw"] == 2
+    assert diag["n_rows_usable"] == 2
+    # micrograph_id is synthesised from path stem when absent
+    assert pairs[0]["micrograph_id"] == "foo"
+    assert pairs[0]["micrograph_path"] == "/runs/input/foo.mrc"
+    assert pairs[0]["gt_coord_path"] == "/runs/input/foo.coord"
+    # gt is optional
+    assert pairs[1]["gt_coord_path"] == ""
+
+
+def test_pairs_csv_diagnostics_json_is_written(tmp_path):
+    """run_relion_log_autopick must persist pairs_csv_diagnostics.json."""
+    csv_path = _write_csv(
+        tmp_path / "pairs.csv",
+        ["micrograph_id", "local_mrc_path", "local_coord_path"],
+        [
+            {
+                "micrograph_id": "mic001",
+                "local_mrc_path": str(tmp_path / "mic001.mrc"),
+                "local_coord_path": "",
+            }
+        ],
+    )
+    cfg = RelionLogAutopickConfig(
+        output_root=tmp_path / "out",
+        pairs_csv=csv_path,
+        dry_run=True,
+    )
+    bundle = run_relion_log_autopick(cfg)
+    diag_path = tmp_path / "out" / "pairs_csv_diagnostics.json"
+    assert diag_path.exists(), "diagnostics file not written"
+    diag = json.loads(diag_path.read_text())
+    assert diag["n_rows_raw"] == 1
+    assert diag["n_rows_usable"] == 1
+    assert "micrograph_id" in diag["fieldnames"]
+    assert diag["first_raw_row"]["micrograph_id"] == "mic001"
+    assert diag["first_usable_row"]["micrograph_id"] == "mic001"
+    # Bundle should not error and the project layout should exist
+    assert bundle["error"] is None
+    assert bundle["n_micrographs"] == 1
+
+
+def test_pairs_csv_empty_returns_empty_error(tmp_path):
+    csv_path = _write_csv(tmp_path / "pairs.csv", ["micrograph_id", "mrc_path"], [])
+    cfg = RelionLogAutopickConfig(
+        output_root=tmp_path / "out",
+        pairs_csv=csv_path,
+        dry_run=True,
+    )
+    bundle = run_relion_log_autopick(cfg)
+    assert bundle["error"] == "pairs_csv is empty"
+
+
+def test_pairs_csv_no_usable_rows_distinct_error(tmp_path):
+    """Rows present but no recognised path column → distinct error message."""
+    csv_path = _write_csv(
+        tmp_path / "pairs.csv",
+        ["unrelated_col", "another"],
+        [{"unrelated_col": "x", "another": "y"}],
+    )
+    cfg = RelionLogAutopickConfig(
+        output_root=tmp_path / "out",
+        pairs_csv=csv_path,
+        dry_run=True,
+    )
+    bundle = run_relion_log_autopick(cfg)
+    assert bundle["error"] == "pairs_csv has rows but no usable micrograph paths"
+    diag = json.loads((tmp_path / "out" / "pairs_csv_diagnostics.json").read_text())
+    assert diag["n_rows_raw"] == 1
+    assert diag["n_rows_usable"] == 0
+    assert diag["dropped_reasons"]
