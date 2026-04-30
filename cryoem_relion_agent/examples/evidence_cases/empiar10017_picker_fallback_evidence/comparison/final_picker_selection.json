@@ -1,0 +1,8 @@
+{
+  "final_action": "RUN_ALTERNATIVE_PICKER",
+  "previous_backend": "topaz_t-4",
+  "previous_micro_f1": 0.031848,
+  "qc_threshold_f1": 0.2,
+  "reason": "Selected relion_log_autopick (available) per priority order.",
+  "selected": "relion_log_autopick"
+}

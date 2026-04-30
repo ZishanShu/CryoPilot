@@ -1,0 +1,52 @@
+[
+  {
+    "evidence": {
+      "relion_autopick_mpi_present": false,
+      "relion_autopick_present": true
+    },
+    "kind": "rule_based_log_picker",
+    "name": "relion_log_autopick",
+    "notes": "RELION LoG/autopick available; can produce real coordinates and be evaluated with the existing F1 evaluator.",
+    "status": "available"
+  },
+  {
+    "evidence": {
+      "predict_py_present": true,
+      "repo_exists": true,
+      "repo_path": "examples/evidence_cases/empiar10017_picker_fallback_evidence/_simulated_backends/CryoTransformer"
+    },
+    "kind": "deep_learning_picker",
+    "name": "cryotransformer_picker",
+    "notes": "Local CryoTransformer repo and predict.py present, but inference command is not verified.  Treat as plan-only until a successful smoke run is recorded.",
+    "status": "partial"
+  },
+  {
+    "evidence": {
+      "cryolo_predict_present": false
+    },
+    "kind": "deep_learning_picker",
+    "name": "cryolo_picker",
+    "notes": "cryolo_predict.py missing; crYOLO is unavailable.  This is non-fatal: the stage will skip crYOLO and continue.",
+    "status": "unavailable"
+  },
+  {
+    "evidence": {
+      "gt_coords_dir": "examples/evidence_cases/empiar10017_picker_fallback_evidence/_simulated_backends/gt_coords",
+      "gt_coords_dir_present": true,
+      "topaz_present": true
+    },
+    "kind": "deep_learning_picker_retrain",
+    "name": "topaz_supervised_retrain",
+    "notes": "topaz binary and GT coordinates available for supervised retraining.",
+    "status": "available"
+  },
+  {
+    "evidence": {
+      "template_picker_script_present": false
+    },
+    "kind": "template_matching_picker",
+    "name": "template_picker",
+    "notes": "Template picker script missing.",
+    "status": "unavailable"
+  }
+]

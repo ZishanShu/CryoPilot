@@ -1,0 +1,31 @@
+{
+  "backend_availability": {
+    "cryolo": "unavailable",
+    "cryotransformer": "partial_local_repo_only",
+    "relion_autopick": "available",
+    "topaz": "available"
+  },
+  "coordinate_alignment_diagnostic": {
+    "median_dx_gt_minus_pred": 13,
+    "median_dy_gt_minus_pred": 1,
+    "median_nearest_dist": 115.95,
+    "p25_nearest_dist": 29.07,
+    "p75_nearest_dist": 213.89,
+    "p90_nearest_dist": 331.07
+  },
+  "dataset": "EMPIAR-10017",
+  "final_action": "FALLBACK_TO_ALTERNATIVE_PICKER_OR_RETRAIN",
+  "picking_qc_passed": false,
+  "qc_threshold_f1": 0.2,
+  "selected_for_backend_execution": "topaz_t-4",
+  "selected_micro_f1": 0.031848,
+  "selection_metric": "picking_micro_f1",
+  "subset": "full84",
+  "topaz_radius_sweep": {
+    "100": 0.1447,
+    "20": 0.0318,
+    "40": 0.1153,
+    "60": 0.1219,
+    "80": 0.1311
+  }
+}
