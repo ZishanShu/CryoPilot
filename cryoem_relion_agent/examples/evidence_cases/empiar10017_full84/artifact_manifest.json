@@ -1,0 +1,1067 @@
+{
+  "case_id": "empiar10017_full84",
+  "source_root": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84",
+  "large_artifacts_not_committed": [
+    {
+      "relative_path": "reconstruct/reconstruct_from_topaz_extract_box_smoke.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/reconstruct/reconstruct_from_topaz_extract_box_smoke.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-02_01_38_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-02_01_38_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-09_36_20_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-09_36_20_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-17_26_54_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-17_26_54_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-17_34_38_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-17_34_38_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-17_14_17_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-17_14_17_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-15_33_42_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-15_33_42_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-15_46_37_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-15_46_37_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-10_20_02_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-10_20_02_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-15_43_48_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-15_43_48_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-03_06_44_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-03_06_44_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-02_55_34_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-02_55_34_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-00_54_11_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-00_54_11_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-16_48_06_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-16_48_06_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-16_44_07_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-16_44_07_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-03_19_23_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-03_19_23_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-10_16_22_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-10_16_22_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-01_10_55_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-01_10_55_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-19_21_25_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-19_21_25_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-17_23_32_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-17_23_32_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-17_17_05_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-17_17_05_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-02_42_04_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-02_42_04_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-02_50_10_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-02_50_10_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-15_36_26_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-15_36_26_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-02_30_25_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-02_30_25_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-01_33_04_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-01_33_04_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-17_37_29_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-17_37_29_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-02_47_14_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-02_47_14_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-09_58_22_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-09_58_22_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-15_07_41_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-15_07_41_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-03_14_23_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-03_14_23_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-19_16_58_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-19_16_58_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-16_59_12_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-16_59_12_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-01_39_04_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-01_39_04_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-19_07_37_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-19_07_37_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-01_22_31_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-01_22_31_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-14_33_35_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-14_33_35_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-16_55_40_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-16_55_40_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-15_41_22_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-15_41_22_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-09_45_47_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-09_45_47_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-00_24_19_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-00_24_19_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-15_14_01_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-15_14_01_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-17_40_47_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-17_40_47_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-15_53_09_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-15_53_09_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-18_07_45_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-18_07_45_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-00_13_13_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-00_13_13_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-02_21_05_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-02_21_05_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-03_01_23_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-03_01_23_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-10_12_03_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-10_12_03_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-09_07_00_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-09_07_00_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-15_30_21_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-15_30_21_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-15_17_31_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-15_17_31_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-10_27_05_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-10_27_05_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-03_22_02_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-03_22_02_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-15_27_22_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-15_27_22_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-18_10_19_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-18_10_19_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-18_21_21_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-18_21_21_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-01_58_43_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-01_58_43_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-00_45_25_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-00_45_25_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-17_46_08_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-17_46_08_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-17_49_17_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-17_49_17_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-00_32_38_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-00_32_38_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-03_27_39_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-03_27_39_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-01_45_42_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-01_45_42_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-01_16_43_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-01_16_43_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-03_24_53_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-03_24_53_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-14_57_34_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-14_57_34_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-02_33_08_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-02_33_08_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-02_52_54_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-02_52_54_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-03_17_02_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-03_17_02_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-02_36_13_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-02_36_13_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-17_02_43_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-17_02_43_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-00_59_38_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-00_59_38_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-02_39_18_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-02_39_18_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-16_26_22_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-16_26_22_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-02_58_06_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-02_58_06_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-18_13_12_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-18_13_12_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-23_58_14_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-23_58_14_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-01_56_06_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-01_56_06_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-01_49_10_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-01_49_10_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-16_51_03_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_12-16_51_03_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-01_05_13_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-01_05_13_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-09_23_00_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-09_23_00_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-00_19_28_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-00_19_28_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_13-01_35_58_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Micrographs/Falcon_2012_06_13-01_35_58_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_35_58_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_35_58_0.mrcs",
+      "size_bytes": 8913920,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_46_37_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_46_37_0.mrcs",
+      "size_bytes": 52429824,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_33_04_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_33_04_0.mrcs",
+      "size_bytes": 3146752,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_59_12_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_59_12_0.mrcs",
+      "size_bytes": 15991808,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_46_08_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_46_08_0.mrcs",
+      "size_bytes": 13370368,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_07_41_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_07_41_0.mrcs",
+      "size_bytes": 18088960,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_41_22_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_41_22_0.mrcs",
+      "size_bytes": 33293312,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_56_06_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_56_06_0.mrcs",
+      "size_bytes": 52429824,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_50_10_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_50_10_0.mrcs",
+      "size_bytes": 29623296,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_44_07_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_44_07_0.mrcs",
+      "size_bytes": 6554624,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_17_02_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_17_02_0.mrcs",
+      "size_bytes": 35390464,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_06_44_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_06_44_0.mrcs",
+      "size_bytes": 52429824,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_58_43_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_58_43_0.mrcs",
+      "size_bytes": 22545408,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-10_27_05_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-10_27_05_0.mrcs",
+      "size_bytes": 40371200,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_24_53_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_24_53_0.mrcs",
+      "size_bytes": 23069696,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_53_09_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_53_09_0.mrcs",
+      "size_bytes": 52429824,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_55_40_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_55_40_0.mrcs",
+      "size_bytes": 9700352,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_10_55_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_10_55_0.mrcs",
+      "size_bytes": 23331840,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-09_58_22_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-09_58_22_0.mrcs",
+      "size_bytes": 52429824,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_36_26_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_36_26_0.mrcs",
+      "size_bytes": 24642560,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_14_23_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_14_23_0.mrcs",
+      "size_bytes": 8651776,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_34_38_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_34_38_0.mrcs",
+      "size_bytes": 787456,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_27_22_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_27_22_0.mrcs",
+      "size_bytes": 52429824,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_39_18_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_39_18_0.mrcs",
+      "size_bytes": 3146752,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-19_21_25_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-19_21_25_0.mrcs",
+      "size_bytes": 13632512,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_30_25_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_30_25_0.mrcs",
+      "size_bytes": 52429824,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_17_31_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_17_31_0.mrcs",
+      "size_bytes": 1836032,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-09_07_00_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-09_07_00_0.mrcs",
+      "size_bytes": 7603200,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_17_05_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_17_05_0.mrcs",
+      "size_bytes": 33031168,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_36_13_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_36_13_0.mrcs",
+      "size_bytes": 4981760,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-10_12_03_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-10_12_03_0.mrcs",
+      "size_bytes": 5768192,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_21_05_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_21_05_0.mrcs",
+      "size_bytes": 30934016,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_19_23_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_19_23_0.mrcs",
+      "size_bytes": 52429824,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_13_13_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_13_13_0.mrcs",
+      "size_bytes": 52429824,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_39_04_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_39_04_0.mrcs",
+      "size_bytes": 8913920,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_14_17_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_14_17_0.mrcs",
+      "size_bytes": 27264000,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-19_16_58_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-19_16_58_0.mrcs",
+      "size_bytes": 21758976,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_02_43_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_02_43_0.mrcs",
+      "size_bytes": 2098176,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_22_02_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_22_02_0.mrcs",
+      "size_bytes": 47711232,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_22_31_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_22_31_0.mrcs",
+      "size_bytes": 20448256,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-19_07_37_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-19_07_37_0.mrcs",
+      "size_bytes": 52429824,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_54_11_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_54_11_0.mrcs",
+      "size_bytes": 33293312,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_26_22_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_26_22_0.mrcs",
+      "size_bytes": 14681088,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_05_13_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_05_13_0.mrcs",
+      "size_bytes": 7078912,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_52_54_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_52_54_0.mrcs",
+      "size_bytes": 13632512,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_32_38_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_32_38_0.mrcs",
+      "size_bytes": 33293312,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_59_38_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_59_38_0.mrcs",
+      "size_bytes": 15205376,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_24_19_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_24_19_0.mrcs",
+      "size_bytes": 4457472,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_45_25_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_45_25_0.mrcs",
+      "size_bytes": 29885440,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_01_23_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_01_23_0.mrcs",
+      "size_bytes": 17564672,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-18_10_19_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-18_10_19_0.mrcs",
+      "size_bytes": 21496832,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_43_48_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_43_48_0.mrcs",
+      "size_bytes": 26215424,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-18_13_12_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-18_13_12_0.mrcs",
+      "size_bytes": 45351936,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-23_58_14_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-23_58_14_0.mrcs",
+      "size_bytes": 46138368,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_42_04_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_42_04_0.mrcs",
+      "size_bytes": 2622464,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-18_07_45_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-18_07_45_0.mrcs",
+      "size_bytes": 6292480,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_26_54_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_26_54_0.mrcs",
+      "size_bytes": 24118272,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_33_42_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_33_42_0.mrcs",
+      "size_bytes": 34866176,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-14_57_34_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-14_57_34_0.mrcs",
+      "size_bytes": 23593984,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_01_38_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_01_38_0.mrcs",
+      "size_bytes": 39060480,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_47_14_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_47_14_0.mrcs",
+      "size_bytes": 1836032,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-10_16_22_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-10_16_22_0.mrcs",
+      "size_bytes": 19923968,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_14_01_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_14_01_0.mrcs",
+      "size_bytes": 16253952,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-10_20_02_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-10_20_02_0.mrcs",
+      "size_bytes": 15991808,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_37_29_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_37_29_0.mrcs",
+      "size_bytes": 11535360,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-09_36_20_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-09_36_20_0.mrcs",
+      "size_bytes": 7078912,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_16_43_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_16_43_0.mrcs",
+      "size_bytes": 24118272,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_45_42_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_45_42_0.mrcs",
+      "size_bytes": 1836032,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_23_32_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_23_32_0.mrcs",
+      "size_bytes": 25428992,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_58_06_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_58_06_0.mrcs",
+      "size_bytes": 8913920,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_48_06_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_48_06_0.mrcs",
+      "size_bytes": 4195328,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-18_21_21_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-18_21_21_0.mrcs",
+      "size_bytes": 14418944,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-09_23_00_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-09_23_00_0.mrcs",
+      "size_bytes": 9962496,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_40_47_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_40_47_0.mrcs",
+      "size_bytes": 15205376,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-09_45_47_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-09_45_47_0.mrcs",
+      "size_bytes": 11535360,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_30_21_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_30_21_0.mrcs",
+      "size_bytes": 52429824,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-14_33_35_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-14_33_35_0.mrcs",
+      "size_bytes": 30147584,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_49_10_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_49_10_0.mrcs",
+      "size_bytes": 14681088,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_19_28_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_19_28_0.mrcs",
+      "size_bytes": 28574720,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_51_03_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_51_03_0.mrcs",
+      "size_bytes": 4457472,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_49_17_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_49_17_0.mrcs",
+      "size_bytes": 24118272,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_55_34_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_55_34_0.mrcs",
+      "size_bytes": 12059648,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_27_39_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_27_39_0.mrcs",
+      "size_bytes": 52429824,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_33_08_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_33_08_0.mrcs",
+      "size_bytes": 24118272,
+      "exists_at_packaging_time": true
+    }
+  ],
+  "small_files_committed": [
+    {
+      "relative_path": "workflow_summary.json",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/workflow_summary.json",
+      "size_bytes": 48158
+    },
+    {
+      "relative_path": "stage_compare_report.md",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/stage_compare_report.md",
+      "size_bytes": 6593
+    },
+    {
+      "relative_path": "stage_compare_table.csv",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/stage_compare_table.csv",
+      "size_bytes": 4180
+    },
+    {
+      "relative_path": "llm_supervised/llm_supervised_result.json",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/llm_supervised/llm_supervised_result.json",
+      "size_bytes": 1167
+    },
+    {
+      "relative_path": "llm_supervised/llm_stagewise_result.md",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/llm_supervised/llm_stagewise_result.md",
+      "size_bytes": 2681
+    },
+    {
+      "relative_path": "llm_supervised/llm_supervised_result.md",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/llm_supervised/llm_supervised_result.md",
+      "size_bytes": 1111
+    },
+    {
+      "relative_path": "llm_supervised/llm_stagewise_result.json",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/llm_supervised/llm_stagewise_result.json",
+      "size_bytes": 4469
+    },
+    {
+      "relative_path": "rule_based/rule_based_result.md",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/rule_based/rule_based_result.md",
+      "size_bytes": 1216
+    },
+    {
+      "relative_path": "rule_based/stage_decisions.jsonl",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/rule_based/stage_decisions.jsonl",
+      "size_bytes": 2158
+    }
+  ]
+}

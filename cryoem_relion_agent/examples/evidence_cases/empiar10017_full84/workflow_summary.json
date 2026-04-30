@@ -1,0 +1,632 @@
+{
+  "dataset_id": "EMPIAR-10017",
+  "project_id": "empiar10017_same_dataset_full84",
+  "workflow": "same_dataset_particle_picking_to_map2pdb_agent_case",
+  "execution_mode": "real_backends_for_picking_extraction_reconstruction",
+  "out_root": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84",
+  "relion_project": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project",
+  "selected_micrographs": [
+    {
+      "micrograph_id": "Falcon_2012_06_12-14_33_35_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-14_33_35_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-14_33_35_0.coord",
+      "n_coords_used": 115
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-14_57_34_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-14_57_34_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-14_57_34_0.coord",
+      "n_coords_used": 90
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_07_41_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_07_41_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_07_41_0.coord",
+      "n_coords_used": 69
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_14_01_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_14_01_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_14_01_0.coord",
+      "n_coords_used": 62
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_17_31_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_17_31_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_17_31_0.coord",
+      "n_coords_used": 7
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_27_22_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_27_22_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_27_22_0.coord",
+      "n_coords_used": 200
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_30_21_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_30_21_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_30_21_0.coord",
+      "n_coords_used": 200
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_33_42_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_33_42_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_33_42_0.coord",
+      "n_coords_used": 133
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_36_26_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_36_26_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_36_26_0.coord",
+      "n_coords_used": 94
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_41_22_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_41_22_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_41_22_0.coord",
+      "n_coords_used": 127
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_43_48_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_43_48_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_43_48_0.coord",
+      "n_coords_used": 100
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_46_37_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_46_37_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_46_37_0.coord",
+      "n_coords_used": 200
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_53_09_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_53_09_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_53_09_0.coord",
+      "n_coords_used": 200
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-16_26_22_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-16_26_22_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-16_26_22_0.coord",
+      "n_coords_used": 56
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-16_44_07_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-16_44_07_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-16_44_07_0.coord",
+      "n_coords_used": 25
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-16_48_06_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-16_48_06_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-16_48_06_0.coord",
+      "n_coords_used": 16
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-16_51_03_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-16_51_03_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-16_51_03_0.coord",
+      "n_coords_used": 17
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-16_55_40_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-16_55_40_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-16_55_40_0.coord",
+      "n_coords_used": 37
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-16_59_12_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-16_59_12_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-16_59_12_0.coord",
+      "n_coords_used": 61
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-17_02_43_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-17_02_43_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-17_02_43_0.coord",
+      "n_coords_used": 8
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-17_14_17_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-17_14_17_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-17_14_17_0.coord",
+      "n_coords_used": 104
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-17_17_05_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-17_17_05_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-17_17_05_0.coord",
+      "n_coords_used": 126
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-17_23_32_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-17_23_32_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-17_23_32_0.coord",
+      "n_coords_used": 97
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-17_26_54_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-17_26_54_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-17_26_54_0.coord",
+      "n_coords_used": 92
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-17_34_38_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-17_34_38_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-17_34_38_0.coord",
+      "n_coords_used": 3
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-17_37_29_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-17_37_29_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-17_37_29_0.coord",
+      "n_coords_used": 44
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-17_40_47_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-17_40_47_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-17_40_47_0.coord",
+      "n_coords_used": 58
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-17_46_08_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-17_46_08_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-17_46_08_0.coord",
+      "n_coords_used": 51
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-17_49_17_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-17_49_17_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-17_49_17_0.coord",
+      "n_coords_used": 92
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-18_07_45_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-18_07_45_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-18_07_45_0.coord",
+      "n_coords_used": 24
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-18_10_19_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-18_10_19_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-18_10_19_0.coord",
+      "n_coords_used": 82
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-18_13_12_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-18_13_12_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-18_13_12_0.coord",
+      "n_coords_used": 173
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-18_21_21_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-18_21_21_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-18_21_21_0.coord",
+      "n_coords_used": 55
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-19_07_37_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-19_07_37_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-19_07_37_0.coord",
+      "n_coords_used": 200
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-19_16_58_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-19_16_58_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-19_16_58_0.coord",
+      "n_coords_used": 83
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-19_21_25_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-19_21_25_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-19_21_25_0.coord",
+      "n_coords_used": 52
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-23_58_14_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-23_58_14_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-23_58_14_0.coord",
+      "n_coords_used": 176
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-00_13_13_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-00_13_13_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-00_13_13_0.coord",
+      "n_coords_used": 200
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-00_19_28_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-00_19_28_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-00_19_28_0.coord",
+      "n_coords_used": 109
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-00_24_19_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-00_24_19_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-00_24_19_0.coord",
+      "n_coords_used": 17
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-00_32_38_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-00_32_38_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-00_32_38_0.coord",
+      "n_coords_used": 127
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-00_45_25_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-00_45_25_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-00_45_25_0.coord",
+      "n_coords_used": 114
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-00_54_11_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-00_54_11_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-00_54_11_0.coord",
+      "n_coords_used": 127
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-00_59_38_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-00_59_38_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-00_59_38_0.coord",
+      "n_coords_used": 58
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-01_05_13_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-01_05_13_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-01_05_13_0.coord",
+      "n_coords_used": 27
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-01_10_55_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-01_10_55_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-01_10_55_0.coord",
+      "n_coords_used": 89
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-01_16_43_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-01_16_43_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-01_16_43_0.coord",
+      "n_coords_used": 92
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-01_22_31_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-01_22_31_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-01_22_31_0.coord",
+      "n_coords_used": 78
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-01_33_04_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-01_33_04_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-01_33_04_0.coord",
+      "n_coords_used": 12
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-01_35_58_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-01_35_58_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-01_35_58_0.coord",
+      "n_coords_used": 34
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-01_39_04_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-01_39_04_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-01_39_04_0.coord",
+      "n_coords_used": 34
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-01_45_42_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-01_45_42_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-01_45_42_0.coord",
+      "n_coords_used": 7
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-01_49_10_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-01_49_10_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-01_49_10_0.coord",
+      "n_coords_used": 56
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-01_56_06_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-01_56_06_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-01_56_06_0.coord",
+      "n_coords_used": 200
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-01_58_43_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-01_58_43_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-01_58_43_0.coord",
+      "n_coords_used": 86
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-02_01_38_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-02_01_38_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-02_01_38_0.coord",
+      "n_coords_used": 149
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-02_21_05_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-02_21_05_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-02_21_05_0.coord",
+      "n_coords_used": 118
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-02_30_25_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-02_30_25_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-02_30_25_0.coord",
+      "n_coords_used": 200
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-02_33_08_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-02_33_08_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-02_33_08_0.coord",
+      "n_coords_used": 92
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-02_36_13_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-02_36_13_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-02_36_13_0.coord",
+      "n_coords_used": 19
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-02_39_18_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-02_39_18_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-02_39_18_0.coord",
+      "n_coords_used": 12
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-02_42_04_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-02_42_04_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-02_42_04_0.coord",
+      "n_coords_used": 10
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-02_47_14_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-02_47_14_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-02_47_14_0.coord",
+      "n_coords_used": 7
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-02_50_10_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-02_50_10_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-02_50_10_0.coord",
+      "n_coords_used": 113
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-02_52_54_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-02_52_54_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-02_52_54_0.coord",
+      "n_coords_used": 52
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-02_55_34_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-02_55_34_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-02_55_34_0.coord",
+      "n_coords_used": 46
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-02_58_06_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-02_58_06_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-02_58_06_0.coord",
+      "n_coords_used": 34
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-03_01_23_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-03_01_23_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-03_01_23_0.coord",
+      "n_coords_used": 67
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-03_06_44_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-03_06_44_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-03_06_44_0.coord",
+      "n_coords_used": 200
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-03_14_23_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-03_14_23_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-03_14_23_0.coord",
+      "n_coords_used": 33
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-03_17_02_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-03_17_02_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-03_17_02_0.coord",
+      "n_coords_used": 135
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-03_19_23_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-03_19_23_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-03_19_23_0.coord",
+      "n_coords_used": 200
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-03_22_02_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-03_22_02_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-03_22_02_0.coord",
+      "n_coords_used": 182
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-03_24_53_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-03_24_53_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-03_24_53_0.coord",
+      "n_coords_used": 88
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-03_27_39_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-03_27_39_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-03_27_39_0.coord",
+      "n_coords_used": 200
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-09_07_00_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-09_07_00_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-09_07_00_0.coord",
+      "n_coords_used": 29
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-09_23_00_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-09_23_00_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-09_23_00_0.coord",
+      "n_coords_used": 38
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-09_36_20_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-09_36_20_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-09_36_20_0.coord",
+      "n_coords_used": 27
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-09_45_47_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-09_45_47_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-09_45_47_0.coord",
+      "n_coords_used": 44
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-09_58_22_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-09_58_22_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-09_58_22_0.coord",
+      "n_coords_used": 200
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-10_12_03_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-10_12_03_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-10_12_03_0.coord",
+      "n_coords_used": 22
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-10_16_22_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-10_16_22_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-10_16_22_0.coord",
+      "n_coords_used": 76
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-10_20_02_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-10_20_02_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-10_20_02_0.coord",
+      "n_coords_used": 61
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_13-10_27_05_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_13-10_27_05_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_13-10_27_05_0.coord",
+      "n_coords_used": 154
+    }
+  ],
+  "artifacts": {
+    "micrographs_star": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/micrographs.star",
+    "particles_star": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/particles.star",
+    "particle_stacks": [
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-14_33_35_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-14_57_34_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_07_41_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_14_01_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_17_31_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_27_22_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_30_21_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_33_42_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_36_26_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_41_22_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_43_48_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_46_37_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_53_09_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_26_22_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_44_07_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_48_06_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_51_03_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_55_40_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-16_59_12_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_02_43_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_14_17_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_17_05_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_23_32_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_26_54_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_34_38_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_37_29_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_40_47_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_46_08_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-17_49_17_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-18_07_45_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-18_10_19_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-18_13_12_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-18_21_21_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-19_07_37_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-19_16_58_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-19_21_25_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-23_58_14_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_13_13_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_19_28_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_24_19_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_32_38_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_45_25_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_54_11_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-00_59_38_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_05_13_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_10_55_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_16_43_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_22_31_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_33_04_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_35_58_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_39_04_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_45_42_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_49_10_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_56_06_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-01_58_43_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_01_38_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_21_05_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_30_25_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_33_08_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_36_13_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_39_18_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_42_04_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_47_14_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_50_10_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_52_54_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_55_34_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-02_58_06_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_01_23_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_06_44_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_14_23_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_17_02_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_19_23_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_22_02_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_24_53_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-03_27_39_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-09_07_00_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-09_23_00_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-09_36_20_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-09_45_47_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-09_58_22_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-10_12_03_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-10_16_22_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-10_20_02_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_13-10_27_05_0.mrcs"
+    ],
+    "reconstruction_map": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/reconstruct/reconstruct_from_topaz_extract_box_smoke.mrc",
+    "rule_based_decisions": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/rule_based/stage_decisions.jsonl",
+    "map2pdb_sample_state": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/.cryoem_agent/sample_state.json",
+    "map2pdb_action_history": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/relion_project/.cryoem_agent/action_history.jsonl"
+  },
+  "metrics": {
+    "n_micrographs": 84,
+    "total_topaz_coords_used": 7404,
+    "n_extracted_particles": 7404,
+    "n_particle_stacks": 84,
+    "reconstruction_map_exists": true,
+    "reconstruction_map_size_bytes": 67109888
+  },
+  "stage_status": {
+    "picking": "accepted_for_extraction",
+    "extraction": "accepted_for_reconstruction",
+    "reconstruction": "accepted_for_map2pdb",
+    "map2pdb": "recorded"
+  },
+  "logs": {
+    "extract": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/logs/relion_preprocess_extract.log",
+    "reconstruct": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/logs/relion_reconstruct.log",
+    "map2pdb": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full84/map2pdb/run_next_map2pdb_dry-run.log"
+  },
+  "llm_supervised": {
+    "status": "ok",
+    "model": "gpt-5.5",
+    "raw_text": "{\n  \"accept_backend_execution\": true,\n  \"accept_for_downstream\": false,\n  \"risk_level\": \"high\",\n  \"main_issue\": \"Runtime artifacts indicate picking, extraction, and a reconstruction command completed, but the result is not scientifically validated for map2pdb/model building. The reconstruction appears to be a smoke/test map from only 84 micrographs and 7,404 particles, with no reported CTF validation, particle-quality assessment, 2D classification, ab-initio/3D refinement, gold-standard FSC, local resolution, map sharpening, or evidence that the map contains interpretable biological signal. The map2pdb step is recorded as a dry-run/action history rather than a validated modeling result.\",\n  \"recommended_next_action\": \"Do not use this map for downstream model building yet. Inspect picks and extracted particles, run 2D classification and remove junk, perform proper 3D refinement/reconstruction with independent half-maps and FSC validation, report resolution and map quality metrics, then only proceed to map2pdb if the refined map is interpretable and passes validation.\"\n}"
+  }
+}

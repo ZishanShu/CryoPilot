@@ -1,0 +1,51 @@
+{
+  "case_id": "empiar10017_first1",
+  "source_root": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm",
+  "large_artifacts_not_committed": [
+    {
+      "relative_path": "reconstruct/reconstruct_from_topaz_extract_box_smoke.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/reconstruct/reconstruct_from_topaz_extract_box_smoke.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Micrographs/Falcon_2012_06_12-14_33_35_0.mrc",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/relion_project/Micrographs/Falcon_2012_06_12-14_33_35_0.mrc",
+      "size_bytes": 67109888,
+      "exists_at_packaging_time": true
+    },
+    {
+      "relative_path": "relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-14_33_35_0.mrcs",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-14_33_35_0.mrcs",
+      "size_bytes": 30147584,
+      "exists_at_packaging_time": true
+    }
+  ],
+  "small_files_committed": [
+    {
+      "relative_path": "workflow_summary.json",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/workflow_summary.json",
+      "size_bytes": 3834
+    },
+    {
+      "relative_path": "llm_supervised/llm_supervised_result.json",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/llm_supervised/llm_supervised_result.json",
+      "size_bytes": 920
+    },
+    {
+      "relative_path": "llm_supervised/llm_supervised_result.md",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/llm_supervised/llm_supervised_result.md",
+      "size_bytes": 862
+    },
+    {
+      "relative_path": "rule_based/rule_based_result.md",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/rule_based/rule_based_result.md",
+      "size_bytes": 1287
+    },
+    {
+      "relative_path": "rule_based/stage_decisions.jsonl",
+      "absolute_path": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/rule_based/stage_decisions.jsonl",
+      "size_bytes": 2243
+    }
+  ]
+}

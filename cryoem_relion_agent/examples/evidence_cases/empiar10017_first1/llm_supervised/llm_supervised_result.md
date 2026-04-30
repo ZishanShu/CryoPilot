@@ -1,0 +1,11 @@
+# LLM-supervised Result
+
+```json
+{
+  "accept_backend_execution": true,
+  "accept_for_downstream": false,
+  "risk_level": "high",
+  "main_issue": "Runtime artifacts were produced, but the workflow used only 1 micrograph and 115 particles, with no evidence of validated particle quality, 2D/3D classification, CTF/refinement quality, resolution estimation, or meaningful map interpretability. The map2pdb stage appears only recorded/dry-run, not scientifically justified.",
+  "recommended_next_action": "Treat this as a backend smoke test only. Do not use the reconstruction or map2pdb output for scientific downstream work. Rerun on a substantially larger same-dataset subset/full dataset with CTF-aware preprocessing, particle QC, 2D classification, ab initio/refinement, FSC/resolution validation, and visual map inspection before any map-to-model step."
+}
+```

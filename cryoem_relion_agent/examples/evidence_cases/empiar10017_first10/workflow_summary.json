@@ -1,0 +1,114 @@
+{
+  "dataset_id": "EMPIAR-10017",
+  "project_id": "empiar10017_same_dataset_first10",
+  "workflow": "same_dataset_particle_picking_to_map2pdb_agent_case",
+  "execution_mode": "real_backends_for_picking_extraction_reconstruction",
+  "out_root": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10",
+  "relion_project": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/relion_project",
+  "selected_micrographs": [
+    {
+      "micrograph_id": "Falcon_2012_06_12-14_33_35_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-14_33_35_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-14_33_35_0.coord",
+      "n_coords_used": 115
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-14_57_34_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-14_57_34_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-14_57_34_0.coord",
+      "n_coords_used": 90
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_07_41_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_07_41_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_07_41_0.coord",
+      "n_coords_used": 69
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_14_01_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_14_01_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_14_01_0.coord",
+      "n_coords_used": 62
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_17_31_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_17_31_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_17_31_0.coord",
+      "n_coords_used": 7
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_27_22_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_27_22_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_27_22_0.coord",
+      "n_coords_used": 200
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_30_21_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_30_21_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_30_21_0.coord",
+      "n_coords_used": 200
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_33_42_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_33_42_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_33_42_0.coord",
+      "n_coords_used": 133
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_36_26_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_36_26_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_36_26_0.coord",
+      "n_coords_used": 94
+    },
+    {
+      "micrograph_id": "Falcon_2012_06_12-15_41_22_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-15_41_22_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-15_41_22_0.coord",
+      "n_coords_used": 127
+    }
+  ],
+  "artifacts": {
+    "micrographs_star": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/relion_project/micrographs.star",
+    "particles_star": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/relion_project/Extract/job001_box/particles.star",
+    "particle_stacks": [
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-14_33_35_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-14_57_34_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_07_41_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_14_01_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_17_31_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_27_22_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_30_21_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_33_42_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_36_26_0.mrcs",
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-15_41_22_0.mrcs"
+    ],
+    "reconstruction_map": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/reconstruct/reconstruct_from_topaz_extract_box_smoke.mrc",
+    "rule_based_decisions": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/rule_based/stage_decisions.jsonl",
+    "map2pdb_sample_state": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/relion_project/.cryoem_agent/sample_state.json",
+    "map2pdb_action_history": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/relion_project/.cryoem_agent/action_history.jsonl"
+  },
+  "metrics": {
+    "n_micrographs": 10,
+    "total_topaz_coords_used": 1097,
+    "n_extracted_particles": 1097,
+    "n_particle_stacks": 10,
+    "reconstruction_map_exists": true,
+    "reconstruction_map_size_bytes": 67109888
+  },
+  "stage_status": {
+    "picking": "accepted_for_extraction",
+    "extraction": "accepted_for_reconstruction",
+    "reconstruction": "accepted_for_map2pdb",
+    "map2pdb": "recorded"
+  },
+  "logs": {
+    "extract": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/logs/relion_preprocess_extract.log",
+    "reconstruct": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/logs/relion_reconstruct.log",
+    "map2pdb": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first10/map2pdb/run_next_map2pdb_dry-run.log"
+  },
+  "llm_supervised": {
+    "status": "ok",
+    "model": "gpt-5.5",
+    "raw_text": "{\n  \"accept_backend_execution\": true,\n  \"accept_for_downstream\": false,\n  \"risk_level\": \"high\",\n  \"main_issue\": \"Runtime artifacts indicate picking/extraction/reconstruction completed, but scientific acceptance is not justified: only 10 micrographs and 1097 particles were used, the reconstruction is described as a smoke/test map, no FSC/resolution, CTF/motion QC, 2D/3D classification, particle-quality validation, or map interpretability evidence is reported, and map2pdb appears to be dry-run/recorded rather than scientifically executed.\",\n  \"recommended_next_action\": \"Do not use this map for map-to-model or scientific conclusions. Audit the RELION logs for errors/warnings, visually inspect picks/extracted particles and the reconstruction, then rerun a proper cryo-EM workflow on a sufficiently large curated dataset with motion/CTF QC, 2D classification, 3D refinement/classification, gold-standard FSC validation, and only proceed to map2pdb if the map reaches acceptable resolution and interpretability.\"\n}"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "dataset_id": "EMPIAR-10017",
+  "project_id": "empiar10017_same_dataset_first1_fixed_llm",
+  "workflow": "same_dataset_particle_picking_to_map2pdb_agent_case",
+  "execution_mode": "real_backends_for_picking_extraction_reconstruction",
+  "out_root": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm",
+  "relion_project": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/relion_project",
+  "selected_micrographs": [
+    {
+      "micrograph_id": "Falcon_2012_06_12-14_33_35_0",
+      "mrc": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-14_33_35_0.mrc",
+      "topaz_coord": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/outputs/topaz_direct_t-6_r20_patch1024/preds/Falcon_2012_06_12-14_33_35_0.coord",
+      "n_coords_used": 115
+    }
+  ],
+  "artifacts": {
+    "micrographs_star": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/relion_project/micrographs.star",
+    "particles_star": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/relion_project/Extract/job001_box/particles.star",
+    "particle_stacks": [
+      "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/relion_project/Extract/job001_box/Particles/Micrographs/Falcon_2012_06_12-14_33_35_0.mrcs"
+    ],
+    "reconstruction_map": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/reconstruct/reconstruct_from_topaz_extract_box_smoke.mrc",
+    "rule_based_decisions": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/rule_based/stage_decisions.jsonl",
+    "map2pdb_sample_state": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/relion_project/.cryoem_agent/sample_state.json",
+    "map2pdb_action_history": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/relion_project/.cryoem_agent/action_history.jsonl"
+  },
+  "metrics": {
+    "n_micrographs": 1,
+    "total_topaz_coords_used": 115,
+    "n_extracted_particles": 115,
+    "n_particle_stacks": 1,
+    "reconstruction_map_exists": true,
+    "reconstruction_map_size_bytes": 67109888
+  },
+  "stage_status": {
+    "picking": "accepted_for_extraction",
+    "extraction": "accepted_for_reconstruction",
+    "reconstruction": "accepted_for_map2pdb",
+    "map2pdb": "recorded"
+  },
+  "logs": {
+    "extract": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/logs/relion_preprocess_extract.log",
+    "reconstruct": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/logs/relion_reconstruct.log",
+    "map2pdb": "/home/user/CryoAgent/real_runs/empiar10017_same_dataset_agent_full_first1_fixed_llm/map2pdb/run_next_map2pdb_dry-run.log"
+  },
+  "llm_supervised": {
+    "status": "ok",
+    "model": "gpt-5.5",
+    "raw_text": "```json\n{\n  \"accept_backend_execution\": true,\n  \"accept_for_downstream\": false,\n  \"risk_level\": \"high\",\n  \"main_issue\": \"Runtime artifacts were produced, but the workflow used only 1 micrograph and 115 particles, with no evidence of validated particle quality, 2D/3D classification, CTF/refinement quality, resolution estimation, or meaningful map interpretability. The map2pdb stage appears only recorded/dry-run, not scientifically justified.\",\n  \"recommended_next_action\": \"Treat this as a backend smoke test only. Do not use the reconstruction or map2pdb output for scientific downstream work. Rerun on a substantially larger same-dataset subset/full dataset with CTF-aware preprocessing, particle QC, 2D classification, ab initio/refinement, FSC/resolution validation, and visual map inspection before any map-to-model step.\"\n}\n```"
+  }
+}
