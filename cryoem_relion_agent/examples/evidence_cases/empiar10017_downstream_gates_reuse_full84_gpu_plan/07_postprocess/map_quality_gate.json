@@ -1,0 +1,15 @@
+{
+  "allow_map2pdb_real": false,
+  "decision": "ALLOW_MAP2PDB_DRY_RUN",
+  "estimated_resolution": null,
+  "fsc_available": false,
+  "fsc_file": null,
+  "half_maps_available": false,
+  "input_map_path": "/home/user/CryoAgent/real_runs/empiar10017_unified_downstream_gates_full84_real_v3/04_reconstruction/reconstruct_from_relion_log.mrc",
+  "map_exists": true,
+  "map_quality_status": "unvalidated",
+  "mask_available": false,
+  "postprocess_map_exists": false,
+  "postprocess_map_path": null,
+  "resolution_threshold": 4.0
+}

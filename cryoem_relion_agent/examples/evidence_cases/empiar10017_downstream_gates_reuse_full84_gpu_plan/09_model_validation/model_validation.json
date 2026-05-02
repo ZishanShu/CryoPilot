@@ -1,0 +1,8 @@
+{
+  "decision": "SKIP_MODEL_VALIDATION_NO_MODEL",
+  "metrics": null,
+  "model_exists": false,
+  "model_path": null,
+  "stage": "11_model_validation",
+  "status": "skipped"
+}

@@ -1,0 +1,23 @@
+{
+  "backend_availability": {
+    "emodelx": false,
+    "mica": false,
+    "modelangelo": false
+  },
+  "candidate_backends": [
+    "modelangelo",
+    "emodelx",
+    "mica"
+  ],
+  "decision": "BLOCK_MAP2PDB_NO_AVAILABLE_BACKEND",
+  "input_map": "/home/user/CryoAgent/real_runs/empiar10017_unified_downstream_gates_full84_real_v3/04_reconstruction/reconstruct_from_relion_log.mrc",
+  "map2pdb_mode": "dry-run",
+  "map_quality_status": "unvalidated",
+  "map_source": "reconstruct",
+  "real_run_allowed": false,
+  "reason": "No model-building backend executable found on PATH",
+  "selected_backend": null,
+  "sequence": null,
+  "sequence_provided": false,
+  "stage": "10_map2pdb_routing"
+}
