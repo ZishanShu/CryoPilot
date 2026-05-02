@@ -666,8 +666,10 @@ class TestFullPipelineDryRun:
         ])
 
         summary = json.loads((out_root / "workflow_summary.json").read_text())
-        assert "picker-stage backend selection" in summary["scientific_caveat"]
-        assert "not final structure determination" in summary["scientific_caveat"]
+        caveat = summary["scientific_caveat"].lower()
+        assert "downstream-gated" in caveat or \
+            "picker-stage backend selection" in caveat
+        assert "not final structure determination" in caveat
 
     def test_topaz_evidence_recorded(self, tmp_path: Path) -> None:
         pairs_csv = _make_pairs_csv(tmp_path, n=2)
@@ -1166,3 +1168,225 @@ class TestPipelineDryRunRobustness:
         assert (out_root / "05_class2d" / "class2d_plan.json").exists()
         assert (out_root / "08_map2pdb_routing" / "map2pdb_routing.json").exists()
         assert "stage03" in summary["args"].get("stage_errors", {})
+
+
+# ---------------------------------------------------------------------------
+# GPU detection / planning tests
+# ---------------------------------------------------------------------------
+
+
+from agent.downstream_gates import detect_relion_refine_gpu_support  # noqa: E402
+
+
+class TestGpuDetectionAndPlanning:
+    def test_detect_gpu_support_true(self, tmp_path: Path) -> None:
+        bin_path = tmp_path / "relion_refine"
+        bin_path.write_text("#!/bin/sh", encoding="utf-8")
+        ok = detect_relion_refine_gpu_support(
+            bin_path,
+            help_runner=lambda cmd: "Usage: relion_refine ...\n  --gpu (false) : Use GPU\n",
+        )
+        assert ok is True
+
+    def test_detect_gpu_support_false(self, tmp_path: Path) -> None:
+        bin_path = tmp_path / "relion_refine"
+        bin_path.write_text("#!/bin/sh", encoding="utf-8")
+        ok = detect_relion_refine_gpu_support(
+            bin_path, help_runner=lambda cmd: "Usage: ...\n  --i input\n",
+        )
+        assert ok is False
+
+    def test_class2d_plan_includes_gpu_when_supported(self, tmp_path: Path) -> None:
+        ps = _write_particles_star(tmp_path)
+        out = tmp_path / "07"
+        result = stage07_class2d_gate(
+            out, particles_star=ps, n_particles=84879,
+            relion_bin_dir=None, mode="plan-only",
+            gpu_devices="0", gpu_supported=True,
+        )
+        assert result["gpu_requested"] is True
+        assert result["gpu_supported"] is True
+        assert "--gpu" in result["cmd"]
+        assert result["cmd"][result["cmd"].index("--gpu") + 1] == "0"
+        assert result["decision"] == "PLAN_CLASS2D"
+
+    def test_class2d_plan_blocks_when_gpu_unsupported(self, tmp_path: Path) -> None:
+        ps = _write_particles_star(tmp_path)
+        out = tmp_path / "07"
+        result = stage07_class2d_gate(
+            out, particles_star=ps, n_particles=84879,
+            relion_bin_dir=None, mode="plan-only",
+            gpu_devices="0:1", gpu_supported=False,
+        )
+        assert result["gpu_requested"] is True
+        assert result["gpu_supported"] is False
+        assert result["decision"] == "BLOCK_GPU_REQUESTED_BUT_UNAVAILABLE"
+        assert "--gpu" not in result["cmd"]
+
+    def test_refine3d_plan_includes_gpu_when_supported(self, tmp_path: Path) -> None:
+        ps = _write_particles_star(tmp_path)
+        map_path = tmp_path / "map.mrc"; map_path.write_bytes(b"\x00" * 10)
+        out = tmp_path / "08"
+        result = stage08_refine3d_gate(
+            out, map_path=map_path, map_exists=True,
+            particles_star=ps, n_particles=84879,
+            relion_bin_dir=None, mode="plan-only",
+            gpu_devices="0", gpu_supported=True,
+        )
+        assert "--gpu" in result["cmd"]
+        assert result["decision"] == "PLAN_REFINE3D"
+        assert result["gpu_requested"] is True
+
+
+# ---------------------------------------------------------------------------
+# Upstream reuse tests
+# ---------------------------------------------------------------------------
+
+
+def _write_upstream_summary(reuse_root: Path) -> None:
+    """Synthesize an upstream out_root with workflow_summary.json + map + particles.star."""
+    reuse_root.mkdir(parents=True, exist_ok=True)
+    project = reuse_root / "03_extract_project" / "relion_project" / \
+        "Extract" / "job002_log"
+    project.mkdir(parents=True, exist_ok=True)
+    particles = project / "particles.star"
+    particles.write_text(
+        "data_\n\nloop_\n_rlnImageName #1\n001@Particles/mic.mrcs\n",
+        encoding="utf-8",
+    )
+    recon = reuse_root / "04_reconstruction"
+    recon.mkdir(parents=True, exist_ok=True)
+    map_path = recon / "reconstruct_from_relion_log.mrc"
+    map_path.write_bytes(b"\x00" * 4096)
+
+    summary = {
+        "pipeline": "empiar10017_closed_loop_picker_to_reconstruction",
+        "picker_selection": {
+            "topaz_f1": 0.031848,
+            "qc_threshold_f1": 0.2,
+            "stage02_selected_picker": "relion_log_autopick",
+            "stage02_final_action": "RUN_ALTERNATIVE_PICKER",
+            "selected_picker": "relion_log_autopick",
+            "final_action": "RUN_ALTERNATIVE_PICKER",
+        },
+        "relion_log_rerun": {
+            "mode": "real_run", "f1": 0.649950, "precision": 0.7, "recall": 0.6,
+            "predicted_count": 84879, "gt_count": 84879, "matched_count": 50000,
+            "qc_passed": True,
+        },
+        "extraction": {
+            "n_particles": 84879,
+            "particles_star": str(particles),
+            "returncode": 0,
+        },
+        "reconstruction": {
+            "map_exists": True,
+            "map_path": str(map_path),
+            "map_size_bytes": 4096,
+        },
+    }
+    (reuse_root / "workflow_summary.json").write_text(
+        json.dumps(summary, indent=2), encoding="utf-8",
+    )
+
+
+class TestUpstreamReuse:
+    def test_reuse_loads_existing_summary_and_runs_only_downstream(
+        self, tmp_path: Path
+    ) -> None:
+        reuse_root = tmp_path / "upstream"
+        _write_upstream_summary(reuse_root)
+        out_root = tmp_path / "downstream"
+
+        # Spy on _run_cmd to confirm no RELION binary is invoked.
+        called: List[List[str]] = []
+
+        def spy_run(cmd: List[str], log_path: Path, cwd=None, env=None) -> Dict[str, Any]:
+            called.append(cmd)
+            return {"returncode": 0, "runtime_sec": 0.0, "log": str(log_path),
+                    "has_error_pattern": False}
+
+        with patch(
+            "run_empiar10017_closed_loop_picker_to_reconstruction._run_cmd",
+            side_effect=spy_run,
+        ):
+            main([
+                "--reuse-upstream-root", str(reuse_root),
+                "--out-root", str(out_root),
+                "--downstream-mode", "plan-only",
+                "--map2pdb-mode", "dry-run",
+            ])
+
+        assert called == [], "No RELION subprocess should run during reuse"
+
+        summary = json.loads((out_root / "workflow_summary.json").read_text())
+        assert summary["upstream_reused"] is True
+        assert summary["reuse_upstream_root"].endswith("upstream")
+        for k in ("01_topaz_evidence", "02_picker_fallback", "03_relion_log_rerun",
+                  "04_extract_project", "05_extraction", "06_reconstruction"):
+            assert summary["stage_status"][k] == "reused"
+        # Downstream stages must have produced artifacts.
+        for sub in ("05_class2d", "06_refine3d", "07_postprocess",
+                    "08_map2pdb_routing", "09_model_validation"):
+            assert (out_root / sub).is_dir()
+        assert (out_root / "05_class2d" / "class2d_plan.json").exists()
+        assert (out_root / "07_postprocess" / "map_quality_gate.json").exists()
+        assert (out_root / "08_map2pdb_routing" / "map2pdb_routing.json").exists()
+        assert (out_root / "09_model_validation" / "model_validation.json").exists()
+
+        # Reused metrics must be propagated.
+        assert summary["relion_log_rerun"]["f1"] == 0.649950
+        assert summary["extraction"]["n_particles"] == 84879
+        assert summary["reconstruction"]["map_exists"] is True
+        # Without FSC, final readiness must be a stop-gated state, not "FINAL...".
+        assert summary["final_readiness"] in (
+            "MAP_QC_REQUIRED", "MAP2PDB_READY_DRY_RUN_ONLY",
+        )
+
+    def test_reuse_with_gpu_devices_threads_into_class2d_and_refine3d(
+        self, tmp_path: Path
+    ) -> None:
+        reuse_root = tmp_path / "upstream"
+        _write_upstream_summary(reuse_root)
+        out_root = tmp_path / "downstream"
+
+        with patch(
+            "agent.downstream_gates.detect_relion_refine_gpu_support",
+            return_value=True,
+        ):
+            main([
+                "--reuse-upstream-root", str(reuse_root),
+                "--out-root", str(out_root),
+                "--downstream-mode", "plan-only",
+                "--map2pdb-mode", "dry-run",
+                "--relion-gpu-devices", "0",
+            ])
+
+        class2d = json.loads((out_root / "05_class2d" / "class2d_plan.json").read_text())
+        refine3d = json.loads((out_root / "06_refine3d" / "refine3d_plan.json").read_text())
+        assert class2d["gpu_requested"] is True
+        assert class2d["gpu_supported"] is True
+        assert "--gpu" in class2d["cmd"]
+        assert class2d["cmd"][class2d["cmd"].index("--gpu") + 1] == "0"
+        assert refine3d["gpu_requested"] is True
+        assert "--gpu" in refine3d["cmd"]
+
+    def test_reuse_with_missing_summary_blocks_gracefully(
+        self, tmp_path: Path
+    ) -> None:
+        reuse_root = tmp_path / "upstream_empty"
+        reuse_root.mkdir()
+        out_root = tmp_path / "downstream"
+
+        main([
+            "--reuse-upstream-root", str(reuse_root),
+            "--out-root", str(out_root),
+            "--downstream-mode", "plan-only",
+            "--map2pdb-mode", "dry-run",
+        ])
+
+        # Summary still written, but with the BLOCK decision recorded.
+        summary = json.loads((out_root / "workflow_summary.json").read_text())
+        assert summary["upstream_reused"] is False
+        assert summary["reuse_decision"] == "BLOCK_REUSE_UPSTREAM_SUMMARY_MISSING"
+        assert (out_root / "workflow_summary.md").exists()

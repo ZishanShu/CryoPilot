@@ -565,6 +565,8 @@ def _stage07_class2d(
     particle_diameter_angstrom: float,
     full_dataset: bool,
     skip_large: bool,
+    gpu_devices: Optional[str] = None,
+    gpu_supported: Optional[bool] = None,
 ) -> Dict[str, Any]:
     from agent.downstream_gates import stage07_class2d_gate
     effective_mode = mode
@@ -579,6 +581,8 @@ def _stage07_class2d(
         mode=effective_mode,
         particle_diameter_angstrom=particle_diameter_angstrom,
         full_dataset=full_dataset,
+        gpu_devices=gpu_devices,
+        gpu_supported=gpu_supported,
     )
 
 
@@ -591,6 +595,8 @@ def _stage08_refine3d(
     mode: str,
     particle_diameter_angstrom: float,
     skip_large: bool,
+    gpu_devices: Optional[str] = None,
+    gpu_supported: Optional[bool] = None,
 ) -> Dict[str, Any]:
     from agent.downstream_gates import stage08_refine3d_gate
     effective_mode = mode
@@ -607,6 +613,8 @@ def _stage08_refine3d(
         relion_bin_dir=relion_bin_dir,
         mode=effective_mode,
         particle_diameter_angstrom=particle_diameter_angstrom,
+        gpu_devices=gpu_devices,
+        gpu_supported=gpu_supported,
     )
 
 
@@ -796,6 +804,9 @@ def stage07_write_summary(
     map2pdb_routing: Optional[Dict[str, Any]] = None,
     model_validation: Optional[Dict[str, Any]] = None,
     final_readiness: Optional[str] = None,
+    upstream_reused: bool = False,
+    reuse_upstream_root: Optional[str] = None,
+    reuse_decision: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Persist workflow_summary.json and workflow_summary.md."""
 
@@ -814,12 +825,15 @@ def stage07_write_summary(
             return "skipped"
         return str(g.get("status") or "ok")
 
-    s01 = "ok"
-    s02 = "skipped" if selection_result.get("skipped") else "ok"
-    s03 = _stage_status(relion_result)
-    s04 = "ok"
-    s05 = _stage_status(extract_result)
-    s06 = _stage_status(recon_result)
+    if upstream_reused:
+        s01 = s02 = s03 = s04 = s05 = s06 = "reused"
+    else:
+        s01 = "ok"
+        s02 = "skipped" if selection_result.get("skipped") else "ok"
+        s03 = _stage_status(relion_result)
+        s04 = "ok"
+        s05 = _stage_status(extract_result)
+        s06 = _stage_status(recon_result)
     s07 = _gate_status(class2d_result)
     s08 = _gate_status(refine3d_result)
     if postprocess_result and isinstance(postprocess_result.get("plan"), dict):
@@ -907,12 +921,14 @@ def stage07_write_summary(
             "decision": "SKIP_MODEL_VALIDATION_NO_MODEL",
         },
         "final_readiness": final_readiness or "WORKFLOW_HANDOFF_ONLY",
+        "upstream_reused": bool(upstream_reused),
+        "reuse_upstream_root": reuse_upstream_root,
+        "reuse_decision": reuse_decision,
         "scientific_caveat": (
-            "Autonomous picker-to-reconstruction workflow with closed-loop "
-            "picker fallback and downstream handoff.  Map-to-model routing "
-            "is stop-gated when map QC evidence is missing.  This is "
-            "picker-stage backend selection and downstream handoff, "
-            "not final structure determination."
+            "Downstream-gated autonomous cryo-EM workflow evidence with "
+            "closed-loop picker fallback and downstream handoff. "
+            "Map-to-model routing is stop-gated when map QC evidence is "
+            "missing.  This is not final structure determination."
         ),
     }
 
@@ -942,6 +958,117 @@ def stage07_write_summary(
 # ---------------------------------------------------------------------------
 
 
+def _load_upstream_for_reuse(reuse_root: Path) -> Dict[str, Any]:
+    """Read a prior pipeline out_root and synthesise Stage 01-06 result dicts.
+
+    Returns a dict with keys ``ok`` (bool), ``decision`` (str), ``evidence``,
+    ``selection_result``, ``relion_result``, ``extract_manifest``,
+    ``extract_result`` and ``recon_result``.  When the upstream summary is
+    missing or unparsable, ``ok=False`` and a clear decision code is set.
+    """
+    summary_path = reuse_root / "workflow_summary.json"
+    if not summary_path.is_file():
+        return {
+            "ok": False,
+            "decision": "BLOCK_REUSE_UPSTREAM_SUMMARY_MISSING",
+            "reason": f"workflow_summary.json not found under {reuse_root}",
+        }
+    try:
+        upstream = json.loads(summary_path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": False,
+            "decision": "BLOCK_REUSE_UPSTREAM_SUMMARY_MISSING",
+            "reason": f"failed to parse {summary_path}: {exc}",
+        }
+
+    relion = upstream.get("relion_log_rerun") or {}
+    extraction = upstream.get("extraction") or {}
+    reconstruction = upstream.get("reconstruction") or {}
+    picker = upstream.get("picker_selection") or {}
+
+    particles_star = extraction.get("particles_star")
+    n_particles = int(extraction.get("n_particles") or 0)
+    map_path = reconstruction.get("map_path")
+    map_exists_recorded = bool(reconstruction.get("map_exists"))
+    # Verify the recorded map still exists on disk; otherwise treat as missing.
+    map_exists = map_exists_recorded and bool(map_path) and Path(map_path).is_file()
+
+    evidence = {
+        "selected_for_backend_execution":
+            picker.get("stage02_selected_picker") or "topaz_t-4",
+        "selected_micro_f1": picker.get("topaz_f1"),
+        "qc_threshold_f1": picker.get("qc_threshold_f1"),
+        "picking_qc_passed": False,
+        "source": f"reused_from:{reuse_root}",
+    }
+    selection_result = {
+        "final": {
+            "selected": picker.get("stage02_selected_picker"),
+            "final_action": picker.get("stage02_final_action"),
+        },
+        "reused": True,
+    }
+    relion_result = {
+        "mode": "reused",
+        "f1": relion.get("f1"),
+        "precision": relion.get("precision"),
+        "recall": relion.get("recall"),
+        "predicted_count": relion.get("predicted_count", 0),
+        "gt_count": relion.get("gt_count", 0),
+        "matched_count": relion.get("matched_count", 0),
+        "qc_passed": relion.get("qc_passed"),
+        "qc_threshold_f1": picker.get("qc_threshold_f1"),
+        "reused": True,
+    }
+    extract_manifest = {
+        "n_micrographs": extraction.get("n_micrographs"),
+        "particles_star": particles_star,
+        "reused": True,
+    }
+    extract_result = {
+        "n_particles": n_particles,
+        "particles_star": particles_star,
+        "returncode": 0 if particles_star else None,
+        "reused": True,
+    }
+    recon_result = {
+        "map_path": map_path,
+        "map_exists": map_exists,
+        "map_size_bytes": reconstruction.get("map_size_bytes"),
+        "reused": True,
+    }
+
+    incomplete: List[str] = []
+    if not particles_star:
+        incomplete.append("particles_star")
+    if not map_path:
+        incomplete.append("map_path")
+    if incomplete:
+        return {
+            "ok": False,
+            "decision": "BLOCK_REUSE_UPSTREAM_SUMMARY_MISSING",
+            "reason": f"upstream summary incomplete; missing: {','.join(incomplete)}",
+            "evidence": evidence,
+            "selection_result": selection_result,
+            "relion_result": relion_result,
+            "extract_manifest": extract_manifest,
+            "extract_result": extract_result,
+            "recon_result": recon_result,
+        }
+
+    return {
+        "ok": True,
+        "decision": "REUSE_UPSTREAM_OK",
+        "evidence": evidence,
+        "selection_result": selection_result,
+        "relion_result": relion_result,
+        "extract_manifest": extract_manifest,
+        "extract_result": extract_result,
+        "recon_result": recon_result,
+    }
+
+
 def _build_env(relion_bin_dir: Path) -> Dict[str, str]:
     env = os.environ.copy()
     env["PATH"] = str(relion_bin_dir) + os.pathsep + env.get("PATH", "")
@@ -954,8 +1081,9 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap = argparse.ArgumentParser(
         description="Closed-loop picker fallback → RELION extraction → reconstruction pipeline."
     )
-    ap.add_argument("--pairs-csv", required=True, type=Path,
-                    help="CSV with micrograph_path / gt_coord_path columns.")
+    ap.add_argument("--pairs-csv", required=False, type=Path, default=None,
+                    help="CSV with micrograph_path / gt_coord_path columns. "
+                         "Required unless --reuse-upstream-root is provided.")
     ap.add_argument("--topaz-failed-evidence-json", type=Path, default=None,
                     help="Optional JSON with failed Topaz QC evidence.  "
                          "Constructed from canonical full84 values when absent.")
@@ -1013,7 +1141,24 @@ def main(argv: Optional[List[str]] = None) -> None:
     ap.add_argument("--skip-large-real-runs", action="store_true", default=False,
                     help="Downgrade real-run gates to plan-only.")
 
+    # Upstream reuse + GPU planning.
+    ap.add_argument("--reuse-upstream-root", type=Path, default=None,
+                    help="Path to a prior pipeline out_root with workflow_summary.json. "
+                         "Skips Stages 01-06 and only runs the downstream gates.")
+    ap.add_argument("--start-at-stage", choices=["auto", "downstream-gates"],
+                    default="auto",
+                    help="Force entry point. With 'downstream-gates', requires "
+                         "--reuse-upstream-root.")
+    ap.add_argument("--relion-gpu-devices", type=str, default=None,
+                    help="GPU device spec for relion_refine, e.g. '0' or '0:1'.")
+
     args = ap.parse_args(argv)
+    reuse_upstream = args.reuse_upstream_root is not None or \
+        args.start_at_stage == "downstream-gates"
+    if not reuse_upstream and args.pairs_csv is None:
+        ap.error("--pairs-csv is required unless --reuse-upstream-root is provided")
+    if args.start_at_stage == "downstream-gates" and args.reuse_upstream_root is None:
+        ap.error("--start-at-stage=downstream-gates requires --reuse-upstream-root")
     class2d_mode = args.class2d_mode or args.downstream_mode
     refine3d_mode = args.refine3d_mode or args.downstream_mode
     postprocess_mode = args.postprocess_mode or args.downstream_mode
@@ -1040,7 +1185,7 @@ def main(argv: Optional[List[str]] = None) -> None:
     env = _build_env(relion_bin_dir)
 
     args_dict: Dict[str, Any] = {
-        "pairs_csv": str(args.pairs_csv),
+        "pairs_csv": str(args.pairs_csv) if args.pairs_csv else None,
         "topaz_failed_evidence_json": str(args.topaz_failed_evidence_json),
         "relion_autopick_bin": str(args.relion_autopick_bin),
         "relion_bin_dir": str(relion_bin_dir),
@@ -1052,6 +1197,10 @@ def main(argv: Optional[List[str]] = None) -> None:
         "extract_size": args.extract_size,
         "bg_radius": args.bg_radius,
         "dry_run": args.dry_run,
+        "reuse_upstream_root": str(args.reuse_upstream_root)
+            if args.reuse_upstream_root else None,
+        "start_at_stage": args.start_at_stage,
+        "relion_gpu_devices": args.relion_gpu_devices,
     }
 
     print(f"[pipeline] out_root={out_root}", flush=True)
@@ -1068,105 +1217,154 @@ def main(argv: Optional[List[str]] = None) -> None:
             print(f"[{stage_name}] FAILED: {exc}", flush=True)
             return default
 
-    # -- Stage 01 ----------------------------------------------------------------
-    evidence = _safe(
-        "stage01", stage01_record_topaz_evidence,
-        default={"picking_qc_passed": False, "qc_threshold_f1": args.qc_threshold_f1},
-        out_dir=dir_01,
-        topaz_evidence_json=args.topaz_failed_evidence_json,
-        qc_threshold_f1=args.qc_threshold_f1,
-    )
+    upstream_reused = False
+    reuse_decision: Optional[str] = None
+    if args.reuse_upstream_root is not None or args.start_at_stage == "downstream-gates":
+        reuse_root = args.reuse_upstream_root.resolve() \
+            if args.reuse_upstream_root else None
+        print(f"[pipeline] reuse-upstream-root={reuse_root}", flush=True)
+        loaded = _load_upstream_for_reuse(reuse_root) if reuse_root else {
+            "ok": False, "decision": "BLOCK_REUSE_UPSTREAM_SUMMARY_MISSING",
+            "reason": "no reuse-upstream-root provided",
+        }
+        reuse_decision = loaded.get("decision")
+        upstream_reused = bool(loaded.get("ok"))
+        evidence = loaded.get("evidence") or {
+            "picking_qc_passed": False, "qc_threshold_f1": args.qc_threshold_f1,
+        }
+        selection_result = loaded.get("selection_result") or {
+            "final": {"selected": None, "final_action": None}, "reused": True,
+        }
+        relion_result = loaded.get("relion_result") or {
+            "mode": "reused", "f1": None, "predicted_count": 0,
+            "qc_passed": None, "reused": True,
+        }
+        extract_manifest = loaded.get("extract_manifest") or {"reused": True}
+        extract_result = loaded.get("extract_result") or {
+            "n_particles": 0, "particles_star": None, "reused": True,
+        }
+        recon_result = loaded.get("recon_result") or {
+            "map_exists": False, "map_path": None, "reused": True,
+        }
+        if not upstream_reused:
+            stage_errors["reuse_upstream"] = loaded.get(
+                "reason", "BLOCK_REUSE_UPSTREAM_SUMMARY_MISSING")
+            print(f"[pipeline] {reuse_decision}: {loaded.get('reason')}", flush=True)
+        else:
+            print(f"[pipeline] reused upstream: f1={relion_result.get('f1')}, "
+                  f"n_particles={extract_result.get('n_particles')}, "
+                  f"map_exists={recon_result.get('map_exists')}", flush=True)
+    else:
+        # -- Stage 01 ------------------------------------------------------------
+        evidence = _safe(
+            "stage01", stage01_record_topaz_evidence,
+            default={"picking_qc_passed": False, "qc_threshold_f1": args.qc_threshold_f1},
+            out_dir=dir_01,
+            topaz_evidence_json=args.topaz_failed_evidence_json,
+            qc_threshold_f1=args.qc_threshold_f1,
+        )
 
-    # -- Stage 02 ----------------------------------------------------------------
-    selection_result = _safe(
-        "stage02", stage02_picker_fallback_selection,
-        default={"final": {"selected": None, "final_action": "STAGE02_FAILED"}},
-        evidence=evidence,
-        out_dir=dir_01,
-        relion_autopick_bin=args.relion_autopick_bin,
-    )
-    # Stage 02 is candidate selection only.  Stage 03 is the source of truth
-    # for RELION LoG rerun/evaluation; never abort the pipeline here even if
-    # Stage 02 returns STOP_PLAN_ONLY_NO_VIABLE_PICKER.
+        # -- Stage 02 ------------------------------------------------------------
+        selection_result = _safe(
+            "stage02", stage02_picker_fallback_selection,
+            default={"final": {"selected": None, "final_action": "STAGE02_FAILED"}},
+            evidence=evidence,
+            out_dir=dir_01,
+            relion_autopick_bin=args.relion_autopick_bin,
+        )
+        # Stage 02 is candidate selection only.  Stage 03 is the source of truth
+        # for RELION LoG rerun/evaluation; never abort the pipeline here even if
+        # Stage 02 returns STOP_PLAN_ONLY_NO_VIABLE_PICKER.
 
-    # -- Stage 03 ----------------------------------------------------------------
-    relion_result = _safe(
-        "stage03", stage03_relion_log_rerun,
-        default={
-            "mode": "dry_run" if args.dry_run else "skipped_execution",
-            "f1": None, "precision": None, "recall": None,
-            "predicted_count": 0, "gt_count": 0, "matched_count": 0,
-            "qc_passed": None, "qc_threshold_f1": args.qc_threshold_f1,
-            "skipped": True, "status": "planned",
-        },
-        pairs_csv=args.pairs_csv,
-        out_dir=dir_02,
-        relion_autopick_bin=args.relion_autopick_bin,
-        limit=args.limit,
-        particle_diameter_angstrom=args.particle_diameter_angstrom,
-        pixel_size_angstrom=args.pixel_size_angstrom,
-        qc_threshold_f1=args.qc_threshold_f1,
-        dry_run=args.dry_run,
-    )
+        # -- Stage 03 ------------------------------------------------------------
+        relion_result = _safe(
+            "stage03", stage03_relion_log_rerun,
+            default={
+                "mode": "dry_run" if args.dry_run else "skipped_execution",
+                "f1": None, "precision": None, "recall": None,
+                "predicted_count": 0, "gt_count": 0, "matched_count": 0,
+                "qc_passed": None, "qc_threshold_f1": args.qc_threshold_f1,
+                "skipped": True, "status": "planned",
+            },
+            pairs_csv=args.pairs_csv,
+            out_dir=dir_02,
+            relion_autopick_bin=args.relion_autopick_bin,
+            limit=args.limit,
+            particle_diameter_angstrom=args.particle_diameter_angstrom,
+            pixel_size_angstrom=args.pixel_size_angstrom,
+            qc_threshold_f1=args.qc_threshold_f1,
+            dry_run=args.dry_run,
+        )
 
-    # -- Stage 04 ----------------------------------------------------------------
-    extract_manifest = _safe(
-        "stage04", stage04_materialise_extract_project,
-        default={
-            "n_micrographs": 0, "n_box_files": 0,
-            "status": "planned",
-            "decision": "SKIP_MATERIALIZATION_DRY_RUN_NO_COORDS",
-        },
-        pairs_csv=args.pairs_csv,
-        relion_log_out=dir_02,
-        out_dir=dir_03,
-        limit=args.limit,
-        pixel_size_angstrom=args.pixel_size_angstrom,
-        dry_run=args.dry_run,
-        extract_size=args.extract_size,
-    )
-    # Annotate the manifest when no coords were converted in a dry-run.
-    if args.dry_run and isinstance(extract_manifest, dict) \
-            and not extract_manifest.get("decision") \
-            and (extract_manifest.get("n_converted_coord_files", 0) == 0):
-        extract_manifest["status"] = "planned"
-        extract_manifest["decision"] = "SKIP_MATERIALIZATION_DRY_RUN_NO_COORDS"
-        try:
-            _write_json(dir_03 / "extract_project_manifest.json", extract_manifest)
-        except Exception:
-            pass
+        # -- Stage 04 ------------------------------------------------------------
+        extract_manifest = _safe(
+            "stage04", stage04_materialise_extract_project,
+            default={
+                "n_micrographs": 0, "n_box_files": 0,
+                "status": "planned",
+                "decision": "SKIP_MATERIALIZATION_DRY_RUN_NO_COORDS",
+            },
+            pairs_csv=args.pairs_csv,
+            relion_log_out=dir_02,
+            out_dir=dir_03,
+            limit=args.limit,
+            pixel_size_angstrom=args.pixel_size_angstrom,
+            dry_run=args.dry_run,
+            extract_size=args.extract_size,
+        )
+        # Annotate the manifest when no coords were converted in a dry-run.
+        if args.dry_run and isinstance(extract_manifest, dict) \
+                and not extract_manifest.get("decision") \
+                and (extract_manifest.get("n_converted_coord_files", 0) == 0):
+            extract_manifest["status"] = "planned"
+            extract_manifest["decision"] = "SKIP_MATERIALIZATION_DRY_RUN_NO_COORDS"
+            try:
+                _write_json(dir_03 / "extract_project_manifest.json", extract_manifest)
+            except Exception:
+                pass
 
-    # -- Stage 05 ----------------------------------------------------------------
-    extract_result = _safe(
-        "stage05", stage05_extract,
-        default={
-            "dry_run": args.dry_run, "skipped": True,
-            "n_particles": 0, "particles_star": None, "returncode": None,
-        },
-        extract_project_dir=dir_03,
-        relion_bin_dir=relion_bin_dir,
-        extract_size=args.extract_size,
-        bg_radius=args.bg_radius,
-        dry_run=args.dry_run,
-        env=env,
-    )
+        # -- Stage 05 ------------------------------------------------------------
+        extract_result = _safe(
+            "stage05", stage05_extract,
+            default={
+                "dry_run": args.dry_run, "skipped": True,
+                "n_particles": 0, "particles_star": None, "returncode": None,
+            },
+            extract_project_dir=dir_03,
+            relion_bin_dir=relion_bin_dir,
+            extract_size=args.extract_size,
+            bg_radius=args.bg_radius,
+            dry_run=args.dry_run,
+            env=env,
+        )
 
-    # -- Stage 06 ----------------------------------------------------------------
-    recon_result = _safe(
-        "stage06", stage06_reconstruct,
-        default={
-            "dry_run": args.dry_run, "skipped": True,
-            "map_exists": False, "map_path": None,
-        },
-        extract_project_dir=dir_03,
-        recon_out_dir=dir_04,
-        relion_bin_dir=relion_bin_dir,
-        n_particles=int((extract_result or {}).get("n_particles", 0) or 0),
-        dry_run=args.dry_run,
-        env=env,
-    )
+        # -- Stage 06 ------------------------------------------------------------
+        recon_result = _safe(
+            "stage06", stage06_reconstruct,
+            default={
+                "dry_run": args.dry_run, "skipped": True,
+                "map_exists": False, "map_path": None,
+            },
+            extract_project_dir=dir_03,
+            recon_out_dir=dir_04,
+            relion_bin_dir=relion_bin_dir,
+            n_particles=int((extract_result or {}).get("n_particles", 0) or 0),
+            dry_run=args.dry_run,
+            env=env,
+        )
 
     # Stages 07-11 are gate writers that always run.
+
+    # GPU detection (once) for relion_refine plans.
+    gpu_supported_cached: Optional[bool] = None
+    if args.relion_gpu_devices is not None:
+        from agent.downstream_gates import detect_relion_refine_gpu_support
+        relion_refine_bin = (relion_bin_dir / "relion_refine") \
+            if args.relion_bin_dir else None
+        try:
+            gpu_supported_cached = detect_relion_refine_gpu_support(relion_refine_bin)
+        except Exception:
+            gpu_supported_cached = False
 
     # -- Stage 07: Class2D ------------------------------------------------------
     class2d_result = _safe(
@@ -1179,6 +1377,8 @@ def main(argv: Optional[List[str]] = None) -> None:
         particle_diameter_angstrom=args.particle_diameter_angstrom,
         full_dataset=(args.limit is None or args.limit >= 84),
         skip_large=args.skip_large_real_runs,
+        gpu_devices=args.relion_gpu_devices,
+        gpu_supported=gpu_supported_cached,
     )
     print(f"[stage07] Class2D: status={class2d_result.get('status')}, "
           f"decision={class2d_result.get('decision')}", flush=True)
@@ -1194,6 +1394,8 @@ def main(argv: Optional[List[str]] = None) -> None:
         mode=refine3d_mode,
         particle_diameter_angstrom=args.particle_diameter_angstrom,
         skip_large=args.skip_large_real_runs,
+        gpu_devices=args.relion_gpu_devices,
+        gpu_supported=gpu_supported_cached,
     )
     print(f"[stage08] Refine3D: status={refine3d_result.get('status')}, "
           f"decision={refine3d_result.get('decision')}", flush=True)
@@ -1284,6 +1486,10 @@ def main(argv: Optional[List[str]] = None) -> None:
             map2pdb_routing=routing,
             model_validation=model_validation,
             final_readiness=final_readiness,
+            upstream_reused=upstream_reused,
+            reuse_upstream_root=str(args.reuse_upstream_root.resolve())
+                if args.reuse_upstream_root else None,
+            reuse_decision=reuse_decision,
         )
     except Exception as exc:  # noqa: BLE001
         import traceback as _tb

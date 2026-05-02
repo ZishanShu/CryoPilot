@@ -13,6 +13,7 @@ consume.
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -43,6 +44,53 @@ def _md_table(rows: Dict[str, Any]) -> str:
     return "\n".join(out) + "\n"
 
 
+def detect_relion_refine_gpu_support(
+    relion_refine_bin: Optional[Path],
+    *,
+    help_runner: Optional[Any] = None,
+) -> bool:
+    """Return True iff ``relion_refine --help`` mentions ``--gpu``.
+
+    ``help_runner`` lets tests inject a fake ``(cmd) -> str`` callable to
+    bypass the real subprocess.
+    """
+    if relion_refine_bin is None:
+        return False
+    cmd = [str(relion_refine_bin), "--help"]
+    try:
+        if help_runner is not None:
+            text = help_runner(cmd)
+        else:
+            proc = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=15, check=False,
+            )
+            text = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    except Exception:
+        return False
+    return "--gpu" in (text or "")
+
+
+def _resolve_gpu(
+    *,
+    gpu_devices: Optional[str],
+    gpu_supported: Optional[bool],
+    relion_refine_bin: Optional[Path],
+    help_runner: Optional[Any],
+) -> Dict[str, Any]:
+    """Decide if --gpu can be added to the planned command."""
+    if gpu_devices is None:
+        return {"gpu_requested": False, "gpu_supported": False, "gpu_devices": None}
+    if gpu_supported is None:
+        gpu_supported = detect_relion_refine_gpu_support(
+            relion_refine_bin, help_runner=help_runner,
+        )
+    return {
+        "gpu_requested": True,
+        "gpu_supported": bool(gpu_supported),
+        "gpu_devices": gpu_devices,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Stage 07 – Class2D
 # ---------------------------------------------------------------------------
@@ -57,6 +105,9 @@ def stage07_class2d_gate(
     mode: str = "plan-only",
     particle_diameter_angstrom: float = 120.0,
     full_dataset: bool = True,
+    gpu_devices: Optional[str] = None,
+    gpu_supported: Optional[bool] = None,
+    help_runner: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """Plan / dry-run / real-run Class2D gate.
 
@@ -95,13 +146,17 @@ def stage07_class2d_gate(
                          "n_particles": n_particles}))
         return plan
 
+    relion_refine_bin = (
+        Path(relion_bin_dir) / "relion_refine" if relion_bin_dir else None
+    )
+    gpu_info = _resolve_gpu(
+        gpu_devices=gpu_devices, gpu_supported=gpu_supported,
+        relion_refine_bin=relion_refine_bin, help_runner=help_runner,
+    )
+
     K = 50 if full_dataset else 10
     output_dir = "Class2D/job001/run"
-    cmd = []
-    if relion_bin_dir is not None:
-        cmd.append(str(Path(relion_bin_dir) / "relion_refine"))
-    else:
-        cmd.append("relion_refine")
+    cmd = [str(relion_refine_bin) if relion_refine_bin else "relion_refine"]
     cmd += [
         "--i", str(particles_star),
         "--o", output_dir,
@@ -113,6 +168,8 @@ def stage07_class2d_gate(
         "--norm",
         "--scale",
     ]
+    if gpu_info["gpu_requested"] and gpu_info["gpu_supported"]:
+        cmd += ["--gpu", str(gpu_info["gpu_devices"])]
 
     plan: Dict[str, Any] = {
         "stage": "07_class2d",
@@ -123,9 +180,15 @@ def stage07_class2d_gate(
         "particle_diameter_angstrom": particle_diameter_angstrom,
         "output_dir": output_dir,
         "cmd": cmd,
+        "gpu_requested": gpu_info["gpu_requested"],
+        "gpu_supported": gpu_info["gpu_supported"],
+        "gpu_devices": gpu_info["gpu_devices"],
     }
 
-    if mode in ("plan-only", "dry-run"):
+    if gpu_info["gpu_requested"] and not gpu_info["gpu_supported"]:
+        plan["status"] = "blocked"
+        plan["decision"] = "BLOCK_GPU_REQUESTED_BUT_UNAVAILABLE"
+    elif mode in ("plan-only", "dry-run"):
         plan["status"] = "planned"
         plan["decision"] = "PLAN_CLASS2D"
     else:  # real
@@ -146,6 +209,9 @@ def stage07_class2d_gate(
                     "particles_star": plan["particles_star"],
                     "n_particles": n_particles,
                     "output_dir": output_dir,
+                    "gpu_requested": plan["gpu_requested"],
+                    "gpu_supported": plan["gpu_supported"],
+                    "gpu_devices": plan["gpu_devices"],
                 }) + "\n## Command\n\n```\n" + " ".join(cmd) + "\n```\n")
     return plan
 
@@ -165,6 +231,9 @@ def stage08_refine3d_gate(
     relion_bin_dir: Optional[Path],
     mode: str = "plan-only",
     particle_diameter_angstrom: float = 120.0,
+    gpu_devices: Optional[str] = None,
+    gpu_supported: Optional[bool] = None,
+    help_runner: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """Plan / dry-run / real-run 3D refinement gate."""
     mode = _normalise_mode(mode)
@@ -208,12 +277,16 @@ def stage08_refine3d_gate(
                         {"status": "blocked", "decision": blocking_decision}))
         return plan
 
+    relion_refine_bin = (
+        Path(relion_bin_dir) / "relion_refine" if relion_bin_dir else None
+    )
+    gpu_info = _resolve_gpu(
+        gpu_devices=gpu_devices, gpu_supported=gpu_supported,
+        relion_refine_bin=relion_refine_bin, help_runner=help_runner,
+    )
+
     output_dir = "Refine3D/job001/run"
-    cmd = []
-    if relion_bin_dir is not None:
-        cmd.append(str(Path(relion_bin_dir) / "relion_refine"))
-    else:
-        cmd.append("relion_refine")
+    cmd = [str(relion_refine_bin) if relion_refine_bin else "relion_refine"]
     cmd += [
         "--i", str(particles_star),
         "--ref", str(map_path),
@@ -230,6 +303,8 @@ def stage08_refine3d_gate(
         "--norm",
         "--scale",
     ]
+    if gpu_info["gpu_requested"] and gpu_info["gpu_supported"]:
+        cmd += ["--gpu", str(gpu_info["gpu_devices"])]
 
     plan: Dict[str, Any] = {
         "stage": "08_refine3d",
@@ -241,9 +316,15 @@ def stage08_refine3d_gate(
         "n_particles": n_particles,
         "output_dir": output_dir,
         "cmd": cmd,
+        "gpu_requested": gpu_info["gpu_requested"],
+        "gpu_supported": gpu_info["gpu_supported"],
+        "gpu_devices": gpu_info["gpu_devices"],
     }
 
-    if mode in ("plan-only", "dry-run"):
+    if gpu_info["gpu_requested"] and not gpu_info["gpu_supported"]:
+        plan["status"] = "blocked"
+        plan["decision"] = "BLOCK_GPU_REQUESTED_BUT_UNAVAILABLE"
+    elif mode in ("plan-only", "dry-run"):
         plan["status"] = "planned"
         plan["decision"] = "PLAN_REFINE3D"
     else:
@@ -265,5 +346,8 @@ def stage08_refine3d_gate(
                     "n_particles": n_particles,
                     "map_artifact_from_reconstruct": True,
                     "refined_map_available": False,
+                    "gpu_requested": plan["gpu_requested"],
+                    "gpu_supported": plan["gpu_supported"],
+                    "gpu_devices": plan["gpu_devices"],
                 }) + "\n## Command\n\n```\n" + " ".join(cmd) + "\n```\n")
     return plan
