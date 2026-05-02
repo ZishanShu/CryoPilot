@@ -1,0 +1,11 @@
+{
+  "coord_source": "relion_log_converted_coords",
+  "dry_run": false,
+  "micrographs_star": "/home/user/CryoAgent/real_runs/empiar10017_unified_downstream_gates_full84_real_v3/03_extract_project/relion_project/micrographs.star",
+  "n_box_files": 168,
+  "n_converted_coord_files": 84,
+  "n_micrographs": 84,
+  "n_missing_coord": 0,
+  "n_missing_mrc": 0,
+  "project": "/home/user/CryoAgent/real_runs/empiar10017_unified_downstream_gates_full84_real_v3/03_extract_project/relion_project"
+}

@@ -1,0 +1,25 @@
+{
+  "cmd": [
+    "/home/user/conda_envs/relion/bin/relion_preprocess",
+    "--i",
+    "micrographs.star",
+    "--coord_dir",
+    "Coords",
+    "--coord_suffix",
+    ".box",
+    "--part_dir",
+    "Extract/job002_log/Particles/",
+    "--part_star",
+    "Extract/job002_log/particles.star",
+    "--extract",
+    "--extract_size",
+    "256",
+    "--bg_radius",
+    "100",
+    "--norm",
+    "--white_dust",
+    "-1",
+    "--black_dust",
+    "-1"
+  ]
+}

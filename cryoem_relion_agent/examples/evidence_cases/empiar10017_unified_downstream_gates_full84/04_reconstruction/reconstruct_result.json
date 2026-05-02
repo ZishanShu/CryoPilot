@@ -1,0 +1,16 @@
+{
+  "cmd": [
+    "/home/user/conda_envs/relion/bin/relion_reconstruct",
+    "--i",
+    "Extract/job002_log/particles.star",
+    "--o",
+    "/home/user/CryoAgent/real_runs/empiar10017_unified_downstream_gates_full84_real_v3/04_reconstruction/reconstruct_from_relion_log.mrc"
+  ],
+  "dry_run": false,
+  "log": "/home/user/CryoAgent/real_runs/empiar10017_unified_downstream_gates_full84_real_v3/04_reconstruction/relion_reconstruct.log",
+  "map_exists": true,
+  "map_path": "/home/user/CryoAgent/real_runs/empiar10017_unified_downstream_gates_full84_real_v3/04_reconstruction/reconstruct_from_relion_log.mrc",
+  "map_size_bytes": 67109888,
+  "returncode": 0,
+  "runtime_sec": 62.595
+}
