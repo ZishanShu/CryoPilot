@@ -1,0 +1,9 @@
+{
+  "final_action": "FALLBACK_TO_ALTERNATIVE_PICKER_OR_RETRAIN",
+  "picking_qc_passed": false,
+  "qc_threshold_f1": 0.2,
+  "selected_for_backend_execution": "topaz_t-4",
+  "selected_micro_f1": 0.031848,
+  "selection_metric": "picking_micro_f1",
+  "source": "canonical_empiar10017_full84_topaz_failure"
+}

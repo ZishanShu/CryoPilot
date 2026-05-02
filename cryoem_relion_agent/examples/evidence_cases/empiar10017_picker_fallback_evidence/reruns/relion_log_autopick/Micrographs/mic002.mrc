@@ -1,0 +1,1 @@
+/home/user/CryoAgent/cryoem_relion_agent/examples/evidence_cases/empiar10017_picker_fallback_evidence/_simulated_backends/Micrographs/mic002.mrc

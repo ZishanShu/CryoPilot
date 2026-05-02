@@ -1,0 +1,9 @@
+{
+  "cmd": [
+    "/home/user/conda_envs/relion/bin/relion_reconstruct",
+    "--i",
+    "Extract/job002_log/particles.star",
+    "--o",
+    "/home/user/CryoAgent/real_runs/empiar10017_unified_picker_to_reconstruction_full84_real_v2/04_reconstruction/reconstruct_from_relion_log.mrc"
+  ]
+}

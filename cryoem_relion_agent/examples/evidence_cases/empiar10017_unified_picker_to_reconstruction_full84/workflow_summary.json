@@ -1,0 +1,61 @@
+{
+  "args": {
+    "bg_radius": 100,
+    "dry_run": false,
+    "extract_size": 256,
+    "limit": 84,
+    "out_root": "/home/user/CryoAgent/real_runs/empiar10017_unified_picker_to_reconstruction_full84_real_v2",
+    "pairs_csv": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/tables/empiar10017_full_pairs.csv",
+    "particle_diameter_angstrom": 120.0,
+    "pixel_size_angstrom": 1.0,
+    "qc_threshold_f1": 0.2,
+    "relion_autopick_bin": "/home/user/conda_envs/relion/bin/relion_autopick",
+    "relion_bin_dir": "/home/user/conda_envs/relion/bin",
+    "topaz_failed_evidence_json": "None"
+  },
+  "artifacts": {
+    "01_picker_selection": "/home/user/CryoAgent/real_runs/empiar10017_unified_picker_to_reconstruction_full84_real_v2/01_picker_selection",
+    "02_relion_log_rerun": "/home/user/CryoAgent/real_runs/empiar10017_unified_picker_to_reconstruction_full84_real_v2/02_relion_log_rerun",
+    "03_extract_project": "/home/user/CryoAgent/real_runs/empiar10017_unified_picker_to_reconstruction_full84_real_v2/03_extract_project",
+    "04_reconstruction": "/home/user/CryoAgent/real_runs/empiar10017_unified_picker_to_reconstruction_full84_real_v2/04_reconstruction",
+    "reports": "/home/user/CryoAgent/real_runs/empiar10017_unified_picker_to_reconstruction_full84_real_v2/reports"
+  },
+  "extraction": {
+    "n_particles": 84879,
+    "particles_star": "/home/user/CryoAgent/real_runs/empiar10017_unified_picker_to_reconstruction_full84_real_v2/03_extract_project/relion_project/Extract/job002_log/particles.star",
+    "returncode": 0
+  },
+  "picker_selection": {
+    "final_action": "RUN_ALTERNATIVE_PICKER",
+    "qc_threshold_f1": 0.2,
+    "selected_picker": "relion_log_autopick",
+    "stage02_final_action": "STOP_PLAN_ONLY_NO_VIABLE_PICKER",
+    "stage02_selected_picker": "relion_log_autopick",
+    "topaz_f1": 0.031848
+  },
+  "pipeline": "empiar10017_closed_loop_picker_to_reconstruction",
+  "reconstruction": {
+    "map_exists": true,
+    "map_path": "/home/user/CryoAgent/real_runs/empiar10017_unified_picker_to_reconstruction_full84_real_v2/04_reconstruction/reconstruct_from_relion_log.mrc",
+    "map_size_bytes": 67109888
+  },
+  "relion_log_rerun": {
+    "f1": 0.64995,
+    "gt_count": 40863,
+    "matched_count": 40863,
+    "mode": "real_run",
+    "precision": 0.481427,
+    "predicted_count": 84879,
+    "qc_passed": true,
+    "recall": 1.0
+  },
+  "scientific_caveat": "This is picker-stage backend selection and downstream handoff, not final structure determination.",
+  "stage_status": {
+    "01_topaz_evidence": "ok",
+    "02_picker_fallback": "ok",
+    "03_relion_log_rerun": "ok",
+    "04_extract_project": "ok",
+    "05_extraction": "ok",
+    "06_reconstruction": "ok"
+  }
+}
