@@ -66,6 +66,20 @@ def _make_gt_coords(tmp_path: Path, n: int = 3) -> None:
         coord_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _make_converted_coords(relion_log_out: Path, n: int = 3) -> None:
+    """Write synthetic Stage03 converted_coords/*.coord files."""
+    cdir = relion_log_out / "converted_coords"
+    cdir.mkdir(parents=True, exist_ok=True)
+    for i in range(n):
+        coord = cdir / f"mic_{i:04d}.coord"
+        coord.write_text(
+            "image_name x_coord y_coord score\n"
+            "mic 100.0 200.0 0.9\n"
+            "mic 150.0 250.0 0.8\n",
+            encoding="utf-8",
+        )
+
+
 def _make_autopick_stars(tmp_path: Path, autopick_dir: Path, n: int = 3) -> None:
     """Write synthetic per-micrograph autopick STAR files."""
     autopick_dir.mkdir(parents=True, exist_ok=True)
@@ -208,7 +222,6 @@ class TestStage03RelionLogRerun:
         _make_gt_coords(tmp_path, n=3)
         out = tmp_path / "rerun"
 
-        # Pre-create autopick STAR files so the parser finds them.
         autopick_dir = out / "AutoPick" / "job001" / "Micrographs"
         _make_autopick_stars(tmp_path, autopick_dir, n=3)
 
@@ -274,6 +287,7 @@ class TestStage04MaterialiseExtractProject:
     def test_creates_project_structure(self, tmp_path: Path) -> None:
         pairs_csv = _make_pairs_csv(tmp_path, n=3)
         relion_log_out = tmp_path / "rerun"
+        _make_converted_coords(relion_log_out, n=3)
 
         out = tmp_path / "extract"
         manifest = stage04_materialise_extract_project(
@@ -283,18 +297,19 @@ class TestStage04MaterialiseExtractProject:
             limit=3,
             pixel_size_angstrom=1.0,
             dry_run=True,
+            extract_size=256,
         )
         project = out / "relion_project"
         assert (project / "micrographs.star").exists()
         assert (project / "Micrographs").is_dir()
-        assert (project / "AutoPick" / "job001" / "Micrographs").is_dir()
+        assert (project / "Coords").is_dir()
+        assert (project / "Coords" / "Micrographs").is_dir()
         assert manifest["n_micrographs"] == 3
 
-    def test_symlinks_autopick_stars_when_present(self, tmp_path: Path) -> None:
+    def test_converts_coords_to_micrographs_box(self, tmp_path: Path) -> None:
         pairs_csv = _make_pairs_csv(tmp_path, n=2)
         relion_log_out = tmp_path / "rerun"
-        autopick_src = relion_log_out / "AutoPick" / "job001" / "Micrographs"
-        _make_autopick_stars(tmp_path, autopick_src, n=2)
+        _make_converted_coords(relion_log_out, n=2)
 
         out = tmp_path / "extract"
         manifest = stage04_materialise_extract_project(
@@ -304,11 +319,16 @@ class TestStage04MaterialiseExtractProject:
             limit=2,
             pixel_size_angstrom=1.0,
             dry_run=True,
+            extract_size=200,
         )
-        coord_dir = out / "relion_project" / "AutoPick" / "job001" / "Micrographs"
-        star_links = list(coord_dir.glob("*_autopick.star"))
-        assert len(star_links) == 2
-        assert manifest["missing_star_count"] == 0
+        coord_dir = out / "relion_project" / "Coords" / "Micrographs"
+        box_files = sorted(coord_dir.glob("*.box"))
+        assert len(box_files) == 2
+        text = box_files[0].read_text(encoding="utf-8")
+        assert "0.000000 100.000000 200 200" in text
+        assert manifest["n_converted_coord_files"] == 2
+        assert manifest["n_box_files"] == 4
+        assert manifest["coord_source"] == "relion_log_converted_coords"
 
     def test_manifest_written(self, tmp_path: Path) -> None:
         pairs_csv = _make_pairs_csv(tmp_path, n=2)
@@ -320,19 +340,23 @@ class TestStage04MaterialiseExtractProject:
             limit=2,
             pixel_size_angstrom=1.0,
             dry_run=True,
+            extract_size=256,
         )
         assert (out / "extract_project_manifest.json").exists()
 
     def test_respects_limit(self, tmp_path: Path) -> None:
         pairs_csv = _make_pairs_csv(tmp_path, n=5)
+        relion_log_out = tmp_path / "rerun"
+        _make_converted_coords(relion_log_out, n=5)
         out = tmp_path / "extract"
         manifest = stage04_materialise_extract_project(
             pairs_csv=pairs_csv,
-            relion_log_out=tmp_path / "rerun",
+            relion_log_out=relion_log_out,
             out_dir=out,
             limit=2,
             pixel_size_angstrom=1.0,
             dry_run=True,
+            extract_size=256,
         )
         assert manifest["n_micrographs"] == 2
 
@@ -392,6 +416,10 @@ class TestStage05Extract:
         assert result["n_particles"] == 1
         assert len(called_cmds) == 1
         assert "relion_preprocess" in called_cmds[0][0]
+        assert "--coord_dir" in called_cmds[0]
+        assert called_cmds[0][called_cmds[0].index("--coord_dir") + 1] == "Coords"
+        assert "--coord_suffix" in called_cmds[0]
+        assert called_cmds[0][called_cmds[0].index("--coord_suffix") + 1] == ".box"
 
 
 # ---------------------------------------------------------------------------
@@ -524,6 +552,32 @@ class TestStage07WriteSummary:
         assert "stage_status" in summary
         assert len(summary["stage_status"]) == 6
 
+    def test_summary_prefers_stage03_relion_when_qc_passed(self, tmp_path: Path) -> None:
+        r = self._make_results()
+        r["selection_result"] = {
+            "final": {
+                "selected": "STOP_PLAN_ONLY_NO_VIABLE_PICKER",
+                "final_action": "STOP_PLAN_ONLY_NO_VIABLE_PICKER",
+            }
+        }
+        r["relion_result"]["qc_passed"] = True
+        r["relion_result"]["f1"] = 0.7
+
+        summary = stage07_write_summary(
+            out_root=tmp_path,
+            evidence=r["evidence"],
+            selection_result=r["selection_result"],
+            relion_result=r["relion_result"],
+            extract_manifest=r["extract_manifest"],
+            extract_result=r["extract_result"],
+            recon_result=r["recon_result"],
+            pairs_csv=tmp_path / "pairs.csv",
+            args_dict={"dry_run": False},
+        )
+
+        assert summary["picker_selection"]["selected_picker"] == "relion_log_autopick"
+        assert summary["picker_selection"]["stage02_selected_picker"] == "STOP_PLAN_ONLY_NO_VIABLE_PICKER"
+
     def test_scientific_caveat_in_md(self, tmp_path: Path) -> None:
         r = self._make_results()
         stage07_write_summary(
@@ -557,6 +611,7 @@ class TestFullPipelineDryRun:
         fake_bin = tmp_path / "relion_autopick"
         fake_bin.write_text("#!/bin/sh\n", encoding="utf-8")
         fake_bin.chmod(0o755)
+        _make_converted_coords(out_root / "02_relion_log_rerun", n=3)
 
         main([
             "--pairs-csv", str(pairs_csv),
@@ -583,6 +638,7 @@ class TestFullPipelineDryRun:
         """RELION extraction project directory must be created in dry-run."""
         pairs_csv = _make_pairs_csv(tmp_path, n=2)
         out_root = tmp_path / "pipeline_out"
+        _make_converted_coords(out_root / "02_relion_log_rerun", n=2)
 
         main([
             "--pairs-csv", str(pairs_csv),
@@ -594,6 +650,7 @@ class TestFullPipelineDryRun:
         project = out_root / "03_extract_project" / "relion_project"
         assert (project / "micrographs.star").exists()
         assert (project / "Micrographs").is_dir()
+        assert (project / "Coords" / "Micrographs").is_dir()
         assert (out_root / "03_extract_project" / "extract_command.json").exists()
 
     def test_workflow_summary_has_scientific_caveat(self, tmp_path: Path) -> None:
@@ -652,3 +709,56 @@ class TestFullPipelineDryRun:
             (out_root / "01_picker_selection" / "topaz_failed_evidence.json").read_text()
         )
         assert ev_out["selected_micro_f1"] == 0.01
+
+    def test_mocked_non_dry_run_reconstructs_when_particles_present(self, tmp_path: Path) -> None:
+        pairs_csv = _make_pairs_csv(tmp_path, n=2)
+        out_root = tmp_path / "pipeline_out"
+        relion_bin = tmp_path / "relion_bin"
+        relion_bin.mkdir(parents=True, exist_ok=True)
+
+        def fake_stage03(**kwargs: Any) -> Dict[str, Any]:
+            out_dir = kwargs["out_dir"]
+            _make_converted_coords(out_dir, n=2)
+            return {
+                "mode": "real_run",
+                "returncode": 0,
+                "f1": 0.7,
+                "precision": 0.7,
+                "recall": 0.7,
+                "predicted_count": 20,
+                "gt_count": 20,
+                "matched_count": 14,
+                "qc_passed": True,
+            }
+
+        def fake_run(cmd: List[str], log_path: Path, cwd=None, env=None) -> Dict[str, Any]:
+            if "relion_preprocess" in cmd[0]:
+                ps = Path(cwd) / "Extract" / "job002_log" / "particles.star"
+                ps.parent.mkdir(parents=True, exist_ok=True)
+                ps.write_text(
+                    "data_\n\nloop_\n_rlnImageName #1\n001@Extract/job002_log/Particles/mic.mrcs\n",
+                    encoding="utf-8",
+                )
+            if "relion_reconstruct" in cmd[0]:
+                map_path = Path(cmd[cmd.index("--o") + 1])
+                map_path.parent.mkdir(parents=True, exist_ok=True)
+                map_path.write_bytes(b"\x00" * 1024)
+            return {"returncode": 0, "runtime_sec": 0.1, "log": str(log_path), "has_error_pattern": False}
+
+        with patch(
+            "run_empiar10017_closed_loop_picker_to_reconstruction.stage03_relion_log_rerun",
+            side_effect=fake_stage03,
+        ), patch(
+            "run_empiar10017_closed_loop_picker_to_reconstruction._run_cmd",
+            side_effect=fake_run,
+        ):
+            main([
+                "--pairs-csv", str(pairs_csv),
+                "--relion-bin-dir", str(relion_bin),
+                "--out-root", str(out_root),
+                "--limit", "2",
+            ])
+
+        summary = json.loads((out_root / "workflow_summary.json").read_text())
+        assert summary["extraction"]["n_particles"] > 0
+        assert summary["reconstruction"]["map_exists"] is True

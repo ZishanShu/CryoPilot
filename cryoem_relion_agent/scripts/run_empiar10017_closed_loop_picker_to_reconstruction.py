@@ -259,6 +259,52 @@ def _write_micrographs_star_for_extraction(
     path.write_text(header + rows + "\n", encoding="utf-8")
 
 
+def _parse_coord_xy(coord_path: Path) -> List[Tuple[float, float]]:
+    """Parse center coordinates from a converted_coords .coord file."""
+    centers: List[Tuple[float, float]] = []
+    for raw in coord_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+
+        x_val: Optional[float] = None
+        y_val: Optional[float] = None
+
+        # Format: image_name x_coord y_coord score
+        if len(parts) >= 3:
+            try:
+                x_val = float(parts[1])
+                y_val = float(parts[2])
+            except ValueError:
+                x_val = None
+                y_val = None
+
+        # Generic whitespace/tab format with numeric x/y in first two columns.
+        if x_val is None or y_val is None:
+            try:
+                x_val = float(parts[0])
+                y_val = float(parts[1])
+            except ValueError:
+                continue
+
+        centers.append((x_val, y_val))
+
+    return centers
+
+
+def _coord_to_box_rows(centers: List[Tuple[float, float]], extract_size: int) -> str:
+    half = extract_size / 2.0
+    rows: List[str] = []
+    for x_center, y_center in centers:
+        x_left = x_center - half
+        y_top = y_center - half
+        rows.append(f"{x_left:.6f} {y_top:.6f} {extract_size} {extract_size}")
+    return "\n".join(rows) + ("\n" if rows else "")
+
+
 def stage04_materialise_extract_project(
     pairs_csv: Path,
     relion_log_out: Path,
@@ -267,26 +313,27 @@ def stage04_materialise_extract_project(
     limit: Optional[int],
     pixel_size_angstrom: float,
     dry_run: bool,
+    extract_size: int,
 ) -> Dict[str, Any]:
     """Create a minimal RELION project tree ready for relion_preprocess.
 
-    Micrograph MRC files are symlinked (not copied).  Autopick STAR files
-    from Stage 03 are symlinked into the project so relion_preprocess can
-    find them via --coord_dir.
+    Micrograph MRC files are symlinked (not copied).
+    Stage03 converted coordinates are converted to RELION .box files under:
+    - Coords/<micrograph_id>.box
+    - Coords/Micrographs/<micrograph_id>.box
     """
     import csv
 
     project = out_dir / "relion_project"
     mics_dir = project / "Micrographs"
-    coord_dir = project / "AutoPick" / "job001" / "Micrographs"
+    coords_dir = project / "Coords"
+    coords_mics_dir = coords_dir / "Micrographs"
     mics_dir.mkdir(parents=True, exist_ok=True)
-    coord_dir.mkdir(parents=True, exist_ok=True)
+    coords_mics_dir.mkdir(parents=True, exist_ok=True)
 
-    # Read pairs CSV.
     pairs: List[Dict[str, str]] = []
     with pairs_csv.open("r", encoding="utf-8", newline="") as fh:
         for row in csv.DictReader(fh):
-            # Normalise keys (same aliases as relion_log_autopick_runner).
             mic_path = (
                 row.get("local_mrc_path") or row.get("mrc_path")
                 or row.get("micrograph_path") or row.get("image_path") or ""
@@ -297,12 +344,13 @@ def stage04_materialise_extract_project(
             if limit is not None and len(pairs) >= limit:
                 break
 
-    # Source autopick STAR directory from Stage 03.
-    src_autopick_dir = relion_log_out / "AutoPick" / "job001" / "Micrographs"
+    converted_coords_dir = relion_log_out / "converted_coords"
 
     mic_entries: List[Dict[str, str]] = []
     missing_mrc: List[str] = []
-    missing_star: List[str] = []
+    missing_coord: List[str] = []
+    n_converted_coord_files = 0
+    n_box_files = 0
 
     for p in pairs:
         src_mrc = Path(p["micrograph_path"])
@@ -310,24 +358,25 @@ def stage04_materialise_extract_project(
         dst_mrc = mics_dir / src_mrc.name
         rel_path = f"Micrographs/{src_mrc.name}"
 
-        # Symlink MRC (skip if source absent — expected in dry-run).
         if src_mrc.exists():
             if not dst_mrc.exists() and not dst_mrc.is_symlink():
                 dst_mrc.symlink_to(src_mrc.resolve())
         else:
             missing_mrc.append(str(src_mrc))
-            # Placeholder so STAR is valid in dry-run.
             if not dst_mrc.exists():
                 dst_mrc.write_text("placeholder\n", encoding="utf-8")
 
-        # Symlink autopick STAR file.
-        star_src = src_autopick_dir / f"{stem}_autopick.star"
-        star_dst = coord_dir / f"{stem}_autopick.star"
-        if star_src.exists():
-            if not star_dst.exists() and not star_dst.is_symlink():
-                star_dst.symlink_to(star_src.resolve())
+        coord_src = converted_coords_dir / f"{stem}.coord"
+        box_text = ""
+        if coord_src.exists():
+            n_converted_coord_files += 1
+            centers = _parse_coord_xy(coord_src)
+            box_text = _coord_to_box_rows(centers, extract_size)
+            (coords_dir / f"{stem}.box").write_text(box_text, encoding="utf-8")
+            (coords_mics_dir / f"{stem}.box").write_text(box_text, encoding="utf-8")
+            n_box_files += 2
         else:
-            missing_star.append(str(star_src))
+            missing_coord.append(str(coord_src))
 
         mic_entries.append({"rel_path": rel_path, "stem": stem})
 
@@ -342,15 +391,18 @@ def stage04_materialise_extract_project(
         "project": str(project),
         "micrographs_star": str(micrographs_star),
         "n_micrographs": len(mic_entries),
-        "missing_mrc_count": len(missing_mrc),
-        "missing_star_count": len(missing_star),
+        "n_converted_coord_files": n_converted_coord_files,
+        "n_box_files": n_box_files,
+        "n_missing_mrc": len(missing_mrc),
+        "n_missing_coord": len(missing_coord),
+        "coord_source": "relion_log_converted_coords",
         "dry_run": dry_run,
     }
     _write_json(out_dir / "extract_project_manifest.json", manifest)
 
     print(
         f"[stage04] Extraction project materialised: {len(mic_entries)} micrographs, "
-        f"{len(missing_mrc)} missing MRC, {len(missing_star)} missing STAR",
+        f"{len(missing_mrc)} missing MRC, {len(missing_coord)} missing COORD",
         flush=True,
     )
     return manifest
@@ -378,8 +430,8 @@ def stage05_extract(
     cmd = [
         str(relion_bin_dir / "relion_preprocess"),
         "--i", "micrographs.star",
-        "--coord_dir", "AutoPick/job001/Micrographs/",
-        "--coord_suffix", "_autopick.star",
+        "--coord_dir", "Coords",
+        "--coord_suffix", ".box",
         "--part_dir", "Extract/job002_log/Particles/",
         "--part_star", "Extract/job002_log/particles.star",
         "--extract",
@@ -580,6 +632,12 @@ def stage07_write_summary(
     s05 = _stage_status(extract_result)
     s06 = _stage_status(recon_result)
 
+    stage02_selected = (selection_result.get("final") or {}).get("selected")
+    stage02_final_action = (selection_result.get("final") or {}).get("final_action")
+    relion_qc_passed = bool(relion_result.get("qc_passed"))
+    final_selected_picker = "relion_log_autopick" if relion_qc_passed else stage02_selected
+    final_action = "RUN_ALTERNATIVE_PICKER" if relion_qc_passed else stage02_final_action
+
     summary: Dict[str, Any] = {
         "pipeline": "empiar10017_closed_loop_picker_to_reconstruction",
         "args": args_dict,
@@ -594,8 +652,10 @@ def stage07_write_summary(
         "picker_selection": {
             "topaz_f1": evidence.get("selected_micro_f1"),
             "qc_threshold_f1": evidence.get("qc_threshold_f1"),
-            "selected_picker": (selection_result.get("final") or {}).get("selected"),
-            "final_action": (selection_result.get("final") or {}).get("final_action"),
+            "stage02_selected_picker": stage02_selected,
+            "stage02_final_action": stage02_final_action,
+            "selected_picker": final_selected_picker,
+            "final_action": final_action,
         },
         "relion_log_rerun": {
             "mode": relion_result.get("mode"),
@@ -758,6 +818,7 @@ def main(argv: Optional[List[str]] = None) -> None:
         limit=args.limit,
         pixel_size_angstrom=args.pixel_size_angstrom,
         dry_run=args.dry_run,
+        extract_size=args.extract_size,
     )
 
     # -- Stage 05 ----------------------------------------------------------------

@@ -1,0 +1,7 @@
+model,kind,status,best_f1,qc_threshold_f1,selected,notes
+topaz_t-4,topaz_threshold_sweep,failed_qc,0.031848,0.2,False,Baseline that failed picking F1 QC.
+relion_log_autopick,rule_based_log_picker,available,,0.2,True,RELION LoG/autopick available; can produce real coordinates and be evaluated with the existing F1 evaluator.
+cryotransformer_picker,deep_learning_picker,unavailable,,0.2,False,CryoTransformer repo or predict.py missing.
+cryolo_picker,deep_learning_picker,unavailable,,0.2,False,cryolo_predict.py missing; crYOLO is unavailable.  This is non-fatal: the stage will skip crYOLO and continue.
+topaz_supervised_retrain,deep_learning_picker_retrain,unavailable,,0.2,False,topaz binary or GT coordinate paths missing.
+template_picker,template_matching_picker,unavailable,,0.2,False,Template picker script missing.

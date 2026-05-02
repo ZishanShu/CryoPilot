@@ -1,0 +1,52 @@
+[
+  {
+    "evidence": {
+      "relion_autopick_mpi_present": false,
+      "relion_autopick_present": true
+    },
+    "kind": "rule_based_log_picker",
+    "name": "relion_log_autopick",
+    "notes": "RELION LoG/autopick available; can produce real coordinates and be evaluated with the existing F1 evaluator.",
+    "status": "available"
+  },
+  {
+    "evidence": {
+      "predict_py_present": false,
+      "repo_exists": false,
+      "repo_path": null
+    },
+    "kind": "deep_learning_picker",
+    "name": "cryotransformer_picker",
+    "notes": "CryoTransformer repo or predict.py missing.",
+    "status": "unavailable"
+  },
+  {
+    "evidence": {
+      "cryolo_predict_present": false
+    },
+    "kind": "deep_learning_picker",
+    "name": "cryolo_picker",
+    "notes": "cryolo_predict.py missing; crYOLO is unavailable.  This is non-fatal: the stage will skip crYOLO and continue.",
+    "status": "unavailable"
+  },
+  {
+    "evidence": {
+      "gt_coords_dir": null,
+      "gt_coords_dir_present": false,
+      "topaz_present": false
+    },
+    "kind": "deep_learning_picker_retrain",
+    "name": "topaz_supervised_retrain",
+    "notes": "topaz binary or GT coordinate paths missing.",
+    "status": "unavailable"
+  },
+  {
+    "evidence": {
+      "template_picker_script_present": false
+    },
+    "kind": "template_matching_picker",
+    "name": "template_picker",
+    "notes": "Template picker script missing.",
+    "status": "unavailable"
+  }
+]
