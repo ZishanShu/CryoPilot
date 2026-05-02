@@ -552,7 +552,168 @@ def stage06_reconstruct(
 
 
 # ---------------------------------------------------------------------------
-# Stage 07 – workflow summary
+# Stages 07–11 – downstream scientific gates
+# ---------------------------------------------------------------------------
+
+
+def _stage07_class2d(
+    out_dir: Path,
+    *,
+    extract_result: Dict[str, Any],
+    relion_bin_dir: Optional[Path],
+    mode: str,
+    particle_diameter_angstrom: float,
+    full_dataset: bool,
+    skip_large: bool,
+) -> Dict[str, Any]:
+    from agent.downstream_gates import stage07_class2d_gate
+    effective_mode = mode
+    if mode == "real" and skip_large:
+        effective_mode = "plan-only"
+    particles_star = extract_result.get("particles_star")
+    return stage07_class2d_gate(
+        out_dir,
+        particles_star=Path(particles_star) if particles_star else None,
+        n_particles=int(extract_result.get("n_particles", 0) or 0),
+        relion_bin_dir=relion_bin_dir,
+        mode=effective_mode,
+        particle_diameter_angstrom=particle_diameter_angstrom,
+        full_dataset=full_dataset,
+    )
+
+
+def _stage08_refine3d(
+    out_dir: Path,
+    *,
+    extract_result: Dict[str, Any],
+    recon_result: Dict[str, Any],
+    relion_bin_dir: Optional[Path],
+    mode: str,
+    particle_diameter_angstrom: float,
+    skip_large: bool,
+) -> Dict[str, Any]:
+    from agent.downstream_gates import stage08_refine3d_gate
+    effective_mode = mode
+    if mode == "real" and skip_large:
+        effective_mode = "plan-only"
+    map_path = recon_result.get("map_path")
+    particles_star = extract_result.get("particles_star")
+    return stage08_refine3d_gate(
+        out_dir,
+        map_path=Path(map_path) if map_path else None,
+        map_exists=bool(recon_result.get("map_exists")),
+        particles_star=Path(particles_star) if particles_star else None,
+        n_particles=int(extract_result.get("n_particles", 0) or 0),
+        relion_bin_dir=relion_bin_dir,
+        mode=effective_mode,
+        particle_diameter_angstrom=particle_diameter_angstrom,
+    )
+
+
+def _stage09_postprocess(
+    out_dir: Path,
+    *,
+    recon_result: Dict[str, Any],
+    half_map_1: Optional[Path],
+    half_map_2: Optional[Path],
+    mask: Optional[Path],
+    relion_bin_dir: Optional[Path],
+    mode: str,
+    resolution_threshold: float,
+) -> Dict[str, Any]:
+    from agent.map_quality_gate import stage09_postprocess_gate
+    map_path = recon_result.get("map_path")
+    return stage09_postprocess_gate(
+        out_dir,
+        map_path=Path(map_path) if map_path else None,
+        map_exists=bool(recon_result.get("map_exists")),
+        half_map_1=half_map_1,
+        half_map_2=half_map_2,
+        mask=mask,
+        relion_bin_dir=relion_bin_dir,
+        mode=mode,
+        resolution_threshold=resolution_threshold,
+    )
+
+
+def _stage10_map2pdb(
+    out_dir: Path,
+    *,
+    recon_result: Dict[str, Any],
+    map_quality_gate: Dict[str, Any],
+    sequence: Optional[Path],
+    backends: List[str],
+    mode: str,
+    require_fsc: bool,
+    allow_without_fsc: bool,
+) -> Dict[str, Any]:
+    from agent.map2pdb_routing import stage10_map2pdb_routing
+    pp_map = map_quality_gate.get("postprocess_map_path")
+    if pp_map:
+        map_path: Optional[Path] = Path(pp_map)
+        map_source = "postprocess"
+        map_exists = True
+    else:
+        raw = recon_result.get("map_path")
+        map_path = Path(raw) if raw else None
+        map_source = "reconstruct"
+        map_exists = bool(recon_result.get("map_exists"))
+    return stage10_map2pdb_routing(
+        out_dir,
+        map_path=map_path,
+        map_exists=map_exists,
+        map_source=map_source,
+        map_quality_gate=map_quality_gate,
+        sequence=sequence,
+        backends=backends,
+        mode=mode,
+        require_fsc=require_fsc,
+        allow_without_fsc=allow_without_fsc,
+    )
+
+
+def _stage11_model_validation(
+    out_dir: Path,
+    *,
+    routing: Dict[str, Any],
+    recon_result: Dict[str, Any],
+    sequence: Optional[Path],
+) -> Dict[str, Any]:
+    from agent.model_validation_gate import stage11_model_validation_gate
+    model_path = routing.get("model_output_path")
+    map_path = recon_result.get("map_path")
+    return stage11_model_validation_gate(
+        out_dir,
+        model_path=Path(model_path) if model_path else None,
+        map_path=Path(map_path) if map_path else None,
+        sequence=sequence,
+    )
+
+
+def _compute_final_readiness(
+    *,
+    recon_result: Dict[str, Any],
+    map_quality_gate: Dict[str, Any],
+    routing: Dict[str, Any],
+    model_validation: Dict[str, Any],
+) -> str:
+    """Conservative scientific-readiness verdict for the workflow."""
+    if not recon_result.get("map_exists"):
+        return "WORKFLOW_HANDOFF_ONLY"
+    if model_validation.get("status") == "planned" and \
+            model_validation.get("model_exists"):
+        return "MODEL_VALIDATION_REQUIRED"
+    if routing.get("real_run_allowed"):
+        return "MAP2PDB_REAL_ALLOWED"
+    if routing.get("decision") == "ALLOW_MAP2PDB_DRY_RUN":
+        return "MAP2PDB_READY_DRY_RUN_ONLY"
+    if map_quality_gate.get("map_quality_status") == "unvalidated":
+        return "MAP_QC_REQUIRED"
+    return "WORKFLOW_HANDOFF_ONLY"
+
+
+# ---------------------------------------------------------------------------
+# Stage 12 – workflow summary
 # ---------------------------------------------------------------------------
 
 
@@ -561,10 +722,12 @@ _SUMMARY_MD_TEMPLATE = """\
 
 ## Scientific caveat
 
-This pipeline implements **picker-stage backend selection and downstream
-handoff**.  It does NOT claim final structure determination.  The
-reconstruction map produced here is a technical handoff artefact for
-downstream QC, not a validated cryo-EM structure.
+This pipeline implements **autonomous picker-to-reconstruction workflow**
+with **closed-loop picker fallback and downstream handoff**, towards
+autonomous cryo-EM structure determination.  It does NOT claim final
+structure determination.  The reconstruction map produced here is a
+technical handoff artefact; map-to-model routing is stop-gated when map
+QC evidence (FSC / postprocess) is missing.
 
 ## Stage status
 
@@ -576,6 +739,15 @@ downstream QC, not a validated cryo-EM structure.
 | 04 | Materialise extraction project | {s04} |
 | 05 | relion_preprocess extraction | {s05} |
 | 06 | relion_reconstruct reconstruction | {s06} |
+| 07 | Class2D plan / gate | {s07} |
+| 08 | Refine3D plan / gate | {s08} |
+| 09 | Postprocess / FSC gate | {s09} |
+| 10 | Map-to-PDB routing | {s10} |
+| 11 | Model validation | {s11} |
+
+## Final readiness
+
+**{final_readiness}**
 
 ## Key metrics
 
@@ -597,6 +769,11 @@ downstream QC, not a validated cryo-EM structure.
 - RELION LoG rerun: `02_relion_log_rerun/`
 - Extraction project: `03_extract_project/`
 - Reconstruction: `04_reconstruction/`
+- Class2D plan: `05_class2d/`
+- Refine3D plan: `06_refine3d/`
+- Postprocess / FSC: `07_postprocess/`
+- Map-to-PDB routing: `08_map2pdb_routing/`
+- Model validation: `09_model_validation/`
 - Reports: `reports/`
 """
 
@@ -612,6 +789,13 @@ def stage07_write_summary(
     recon_result: Dict[str, Any],
     pairs_csv: Path,
     args_dict: Dict[str, Any],
+    class2d_result: Optional[Dict[str, Any]] = None,
+    refine3d_result: Optional[Dict[str, Any]] = None,
+    postprocess_result: Optional[Dict[str, Any]] = None,
+    map_quality_gate: Optional[Dict[str, Any]] = None,
+    map2pdb_routing: Optional[Dict[str, Any]] = None,
+    model_validation: Optional[Dict[str, Any]] = None,
+    final_readiness: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Persist workflow_summary.json and workflow_summary.md."""
 
@@ -625,12 +809,25 @@ def stage07_write_summary(
             return "ok"
         return "ok" if rc == 0 else f"failed(rc={rc})"
 
+    def _gate_status(g: Optional[Dict[str, Any]]) -> str:
+        if not g:
+            return "skipped"
+        return str(g.get("status") or "ok")
+
     s01 = "ok"
     s02 = "skipped" if selection_result.get("skipped") else "ok"
     s03 = _stage_status(relion_result)
     s04 = "ok"
     s05 = _stage_status(extract_result)
     s06 = _stage_status(recon_result)
+    s07 = _gate_status(class2d_result)
+    s08 = _gate_status(refine3d_result)
+    if postprocess_result and isinstance(postprocess_result.get("plan"), dict):
+        s09 = _gate_status(postprocess_result["plan"])
+    else:
+        s09 = _gate_status(postprocess_result)
+    s10 = _gate_status(map2pdb_routing) if map2pdb_routing else "skipped"
+    s11 = _gate_status(model_validation)
 
     stage02_selected = (selection_result.get("final") or {}).get("selected")
     stage02_final_action = (selection_result.get("final") or {}).get("final_action")
@@ -648,6 +845,11 @@ def stage07_write_summary(
             "04_extract_project": s04,
             "05_extraction": s05,
             "06_reconstruction": s06,
+            "07_class2d": s07,
+            "08_refine3d": s08,
+            "09_postprocess": s09,
+            "10_map2pdb_routing": s10,
+            "11_model_validation": s11,
         },
         "picker_selection": {
             "topaz_f1": evidence.get("selected_micro_f1"),
@@ -682,10 +884,34 @@ def stage07_write_summary(
             "02_relion_log_rerun": str(out_root / "02_relion_log_rerun"),
             "03_extract_project": str(out_root / "03_extract_project"),
             "04_reconstruction": str(out_root / "04_reconstruction"),
+            "05_class2d": str(out_root / "05_class2d"),
+            "06_refine3d": str(out_root / "06_refine3d"),
+            "07_postprocess": str(out_root / "07_postprocess"),
+            "08_map2pdb_routing": str(out_root / "08_map2pdb_routing"),
+            "09_model_validation": str(out_root / "09_model_validation"),
             "reports": str(out_root / "reports"),
         },
+        "class2d": class2d_result or {"status": "skipped"},
+        "refine3d": refine3d_result or {"status": "skipped"},
+        "postprocess": (postprocess_result or {}).get("plan") if (
+            postprocess_result and isinstance(postprocess_result.get("plan"), dict)
+        ) else (postprocess_result or {"status": "skipped"}),
+        "map_quality_gate": map_quality_gate or {
+            "map_quality_status": "unvalidated",
+            "allow_map2pdb_real": False,
+            "decision": "STOP_MAP_QC_REQUIRED",
+        },
+        "map2pdb_routing": map2pdb_routing or {"status": "skipped"},
+        "model_validation": model_validation or {
+            "status": "skipped",
+            "decision": "SKIP_MODEL_VALIDATION_NO_MODEL",
+        },
+        "final_readiness": final_readiness or "WORKFLOW_HANDOFF_ONLY",
         "scientific_caveat": (
-            "This is picker-stage backend selection and downstream handoff, "
+            "Autonomous picker-to-reconstruction workflow with closed-loop "
+            "picker fallback and downstream handoff.  Map-to-model routing "
+            "is stop-gated when map QC evidence is missing.  This is "
+            "picker-stage backend selection and downstream handoff, "
             "not final structure determination."
         ),
     }
@@ -694,6 +920,8 @@ def stage07_write_summary(
 
     md = _SUMMARY_MD_TEMPLATE.format(
         s01=s01, s02=s02, s03=s03, s04=s04, s05=s05, s06=s06,
+        s07=s07, s08=s08, s09=s09, s10=s10, s11=s11,
+        final_readiness=summary["final_readiness"],
         topaz_f1=evidence.get("selected_micro_f1"),
         relion_f1=relion_result.get("f1"),
         qc_threshold=evidence.get("qc_threshold_f1"),
@@ -751,7 +979,45 @@ def main(argv: Optional[List[str]] = None) -> None:
                     help="Background radius for normalisation (default 100).")
     ap.add_argument("--dry-run", action="store_true",
                     help="Build and record commands but do not execute them.")
+
+    # Downstream-gate CLI options.
+    _gate_choices = ["none", "plan-only", "dry-run", "real"]
+    ap.add_argument("--downstream-mode", choices=_gate_choices, default="plan-only",
+                    help="Default mode for all downstream gates (Stages 07-11).")
+    ap.add_argument("--class2d-mode", choices=_gate_choices, default=None,
+                    help="Override Class2D gate mode (Stage 07).")
+    ap.add_argument("--refine3d-mode", choices=_gate_choices, default=None,
+                    help="Override 3D refinement gate mode (Stage 08).")
+    ap.add_argument("--postprocess-mode", choices=_gate_choices, default=None,
+                    help="Override postprocess/FSC gate mode (Stage 09).")
+    ap.add_argument("--map2pdb-mode", choices=_gate_choices, default="dry-run",
+                    help="Map-to-PDB routing mode (Stage 10).")
+    ap.add_argument("--sequence", type=Path, default=None,
+                    help="Optional FASTA path for map2pdb backends.")
+    ap.add_argument("--mask", type=Path, default=None,
+                    help="Optional mask path for postprocess.")
+    ap.add_argument("--half-map-1", type=Path, default=None,
+                    help="Optional half-map path 1.")
+    ap.add_argument("--half-map-2", type=Path, default=None,
+                    help="Optional half-map path 2.")
+    ap.add_argument("--resolution-threshold", type=float, default=4.0,
+                    help="Conservative resolution threshold (Å) to allow real "
+                         "map-to-model execution.")
+    ap.add_argument("--require-fsc-for-map2pdb", action="store_true", default=True,
+                    help="Require FSC evidence before map-to-model routing.")
+    ap.add_argument("--allow-map2pdb-without-fsc", action="store_true", default=False,
+                    help="Allow dry-run map2pdb routing even without FSC.")
+    ap.add_argument("--model-building-backends", type=str,
+                    default="modelangelo,emodelx,mica",
+                    help="Comma-separated candidate model-building backends.")
+    ap.add_argument("--skip-large-real-runs", action="store_true", default=False,
+                    help="Downgrade real-run gates to plan-only.")
+
     args = ap.parse_args(argv)
+    class2d_mode = args.class2d_mode or args.downstream_mode
+    refine3d_mode = args.refine3d_mode or args.downstream_mode
+    postprocess_mode = args.postprocess_mode or args.downstream_mode
+    backends_list = [b.strip() for b in args.model_building_backends.split(",") if b.strip()]
 
     out_root = args.out_root.resolve()
     out_root.mkdir(parents=True, exist_ok=True)
@@ -760,8 +1026,14 @@ def main(argv: Optional[List[str]] = None) -> None:
     dir_02 = out_root / "02_relion_log_rerun"
     dir_03 = out_root / "03_extract_project"
     dir_04 = out_root / "04_reconstruction"
+    dir_05 = out_root / "05_class2d"
+    dir_06 = out_root / "06_refine3d"
+    dir_07 = out_root / "07_postprocess"
+    dir_08 = out_root / "08_map2pdb_routing"
+    dir_09 = out_root / "09_model_validation"
     reports_dir = out_root / "reports"
-    for d in (dir_01, dir_02, dir_03, dir_04, reports_dir):
+    for d in (dir_01, dir_02, dir_03, dir_04, dir_05, dir_06, dir_07, dir_08,
+              dir_09, reports_dir):
         d.mkdir(parents=True, exist_ok=True)
 
     relion_bin_dir = args.relion_bin_dir or Path(".")
@@ -841,7 +1113,80 @@ def main(argv: Optional[List[str]] = None) -> None:
         env=env,
     )
 
-    # -- Stage 07 ----------------------------------------------------------------
+    # -- Stage 07: Class2D ------------------------------------------------------
+    class2d_result = _stage07_class2d(
+        dir_05,
+        extract_result=extract_result,
+        relion_bin_dir=relion_bin_dir,
+        mode=class2d_mode,
+        particle_diameter_angstrom=args.particle_diameter_angstrom,
+        full_dataset=(args.limit is None or args.limit >= 84),
+        skip_large=args.skip_large_real_runs,
+    )
+    print(f"[stage07] Class2D: status={class2d_result.get('status')}, "
+          f"decision={class2d_result.get('decision')}", flush=True)
+
+    # -- Stage 08: Refine3D -----------------------------------------------------
+    refine3d_result = _stage08_refine3d(
+        dir_06,
+        extract_result=extract_result,
+        recon_result=recon_result,
+        relion_bin_dir=relion_bin_dir,
+        mode=refine3d_mode,
+        particle_diameter_angstrom=args.particle_diameter_angstrom,
+        skip_large=args.skip_large_real_runs,
+    )
+    print(f"[stage08] Refine3D: status={refine3d_result.get('status')}, "
+          f"decision={refine3d_result.get('decision')}", flush=True)
+
+    # -- Stage 09: Postprocess / FSC --------------------------------------------
+    postprocess_bundle = _stage09_postprocess(
+        dir_07,
+        recon_result=recon_result,
+        half_map_1=args.half_map_1,
+        half_map_2=args.half_map_2,
+        mask=args.mask,
+        relion_bin_dir=relion_bin_dir,
+        mode=postprocess_mode,
+        resolution_threshold=args.resolution_threshold,
+    )
+    map_quality_gate = postprocess_bundle["map_quality_gate"]
+    print(f"[stage09] Postprocess: status={postprocess_bundle['plan'].get('status')}, "
+          f"map_quality={map_quality_gate.get('map_quality_status')}, "
+          f"decision={map_quality_gate.get('decision')}", flush=True)
+
+    # -- Stage 10: Map-to-PDB routing -------------------------------------------
+    routing = _stage10_map2pdb(
+        dir_08,
+        recon_result=recon_result,
+        map_quality_gate=map_quality_gate,
+        sequence=args.sequence,
+        backends=backends_list,
+        mode=args.map2pdb_mode,
+        require_fsc=args.require_fsc_for_map2pdb,
+        allow_without_fsc=args.allow_map2pdb_without_fsc,
+    )
+    print(f"[stage10] Map2PDB routing: backend={routing.get('selected_backend')}, "
+          f"decision={routing.get('decision')}", flush=True)
+
+    # -- Stage 11: Model validation ---------------------------------------------
+    model_validation = _stage11_model_validation(
+        dir_09,
+        routing=routing,
+        recon_result=recon_result,
+        sequence=args.sequence,
+    )
+    print(f"[stage11] Model validation: status={model_validation.get('status')}, "
+          f"decision={model_validation.get('decision')}", flush=True)
+
+    final_readiness = _compute_final_readiness(
+        recon_result=recon_result,
+        map_quality_gate=map_quality_gate,
+        routing=routing,
+        model_validation=model_validation,
+    )
+
+    # -- Stage 12: workflow summary ---------------------------------------------
     summary = stage07_write_summary(
         out_root=out_root,
         evidence=evidence,
@@ -852,6 +1197,13 @@ def main(argv: Optional[List[str]] = None) -> None:
         recon_result=recon_result,
         pairs_csv=args.pairs_csv,
         args_dict=args_dict,
+        class2d_result=class2d_result,
+        refine3d_result=refine3d_result,
+        postprocess_result=postprocess_bundle,
+        map_quality_gate=map_quality_gate,
+        map2pdb_routing=routing,
+        model_validation=model_validation,
+        final_readiness=final_readiness,
     )
 
     print(json.dumps({
@@ -861,6 +1213,7 @@ def main(argv: Optional[List[str]] = None) -> None:
         "relion_log_f1": summary["relion_log_rerun"]["f1"],
         "qc_passed": summary["relion_log_rerun"]["qc_passed"],
         "reconstruction_map_exists": summary["reconstruction"]["map_exists"],
+        "final_readiness": summary["final_readiness"],
         "dry_run": args.dry_run,
     }, indent=2))
 

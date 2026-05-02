@@ -550,7 +550,8 @@ class TestStage07WriteSummary:
             args_dict={"dry_run": True},
         )
         assert "stage_status" in summary
-        assert len(summary["stage_status"]) == 6
+        # Stages 01–11 (Stage 12 is the summary itself).
+        assert len(summary["stage_status"]) == 11
 
     def test_summary_prefers_stage03_relion_when_qc_passed(self, tmp_path: Path) -> None:
         r = self._make_results()
@@ -762,3 +763,324 @@ class TestFullPipelineDryRun:
         summary = json.loads((out_root / "workflow_summary.json").read_text())
         assert summary["extraction"]["n_particles"] > 0
         assert summary["reconstruction"]["map_exists"] is True
+
+
+# ---------------------------------------------------------------------------
+# Stage 07 – Class2D gate tests
+# ---------------------------------------------------------------------------
+
+
+from agent.downstream_gates import (  # noqa: E402
+    stage07_class2d_gate,
+    stage08_refine3d_gate,
+)
+from agent.map_quality_gate import stage09_postprocess_gate  # noqa: E402
+from agent.map2pdb_routing import stage10_map2pdb_routing  # noqa: E402
+from agent.model_validation_gate import stage11_model_validation_gate  # noqa: E402
+
+
+def _write_particles_star(tmp_path: Path) -> Path:
+    p = tmp_path / "particles.star"
+    p.write_text(
+        "data_\n\nloop_\n_rlnImageName #1\n001@Particles/mic.mrcs\n",
+        encoding="utf-8",
+    )
+    return p
+
+
+class TestStage07Class2DGate:
+    def test_blocked_when_particles_missing(self, tmp_path: Path) -> None:
+        out = tmp_path / "07"
+        result = stage07_class2d_gate(
+            out, particles_star=None, n_particles=0,
+            relion_bin_dir=None, mode="plan-only",
+        )
+        assert result["status"] == "blocked"
+        assert result["decision"] == "BLOCK_CLASS2D_NO_PARTICLES"
+        assert (out / "class2d_plan.json").exists()
+        assert (out / "class2d_plan.md").exists()
+
+    def test_plan_only_writes_artifacts(self, tmp_path: Path) -> None:
+        ps = _write_particles_star(tmp_path)
+        out = tmp_path / "07"
+        result = stage07_class2d_gate(
+            out, particles_star=ps, n_particles=84879,
+            relion_bin_dir=None, mode="plan-only", full_dataset=True,
+        )
+        assert result["status"] == "planned"
+        assert result["decision"] == "PLAN_CLASS2D"
+        assert result["K"] == 50
+        assert (out / "class2d_plan.json").exists()
+        plan = json.loads((out / "class2d_plan.json").read_text())
+        assert "relion_refine" in plan["cmd"][0]
+
+    def test_real_mode_records_disabled_status(self, tmp_path: Path) -> None:
+        ps = _write_particles_star(tmp_path)
+        out = tmp_path / "07"
+        result = stage07_class2d_gate(
+            out, particles_star=ps, n_particles=84879,
+            relion_bin_dir=None, mode="real",
+        )
+        assert result["status"] == "planned"
+        assert result["decision"] == "REAL_CLASS2D_NOT_IMPLEMENTED_OR_DISABLED"
+
+    def test_none_mode_skips(self, tmp_path: Path) -> None:
+        out = tmp_path / "07"
+        result = stage07_class2d_gate(
+            out, particles_star=None, n_particles=0,
+            relion_bin_dir=None, mode="none",
+        )
+        assert result["status"] == "skipped"
+        assert result["decision"] == "SKIP_CLASS2D"
+
+
+class TestStage08Refine3DGate:
+    def test_blocked_when_no_map(self, tmp_path: Path) -> None:
+        ps = _write_particles_star(tmp_path)
+        out = tmp_path / "08"
+        result = stage08_refine3d_gate(
+            out, map_path=None, map_exists=False,
+            particles_star=ps, n_particles=10, relion_bin_dir=None,
+            mode="plan-only",
+        )
+        assert result["status"] == "blocked"
+        assert result["decision"] == "BLOCK_REFINE3D_NO_MAP"
+        assert result["refined_map_available"] is False
+
+    def test_blocked_when_no_particles(self, tmp_path: Path) -> None:
+        map_path = tmp_path / "map.mrc"
+        map_path.write_bytes(b"\x00" * 10)
+        out = tmp_path / "08"
+        result = stage08_refine3d_gate(
+            out, map_path=map_path, map_exists=True,
+            particles_star=None, n_particles=0, relion_bin_dir=None,
+            mode="plan-only",
+        )
+        assert result["decision"] == "BLOCK_REFINE3D_NO_PARTICLES"
+
+    def test_plan_only_writes_artifacts(self, tmp_path: Path) -> None:
+        ps = _write_particles_star(tmp_path)
+        map_path = tmp_path / "map.mrc"
+        map_path.write_bytes(b"\x00" * 10)
+        out = tmp_path / "08"
+        result = stage08_refine3d_gate(
+            out, map_path=map_path, map_exists=True,
+            particles_star=ps, n_particles=84879,
+            relion_bin_dir=None, mode="plan-only",
+        )
+        assert result["status"] == "planned"
+        assert result["decision"] == "PLAN_REFINE3D"
+        assert (out / "refine3d_plan.json").exists()
+        assert (out / "refine3d_plan.md").exists()
+        assert result["map_artifact_from_reconstruct"] is True
+        assert result["refined_map_available"] is False
+
+
+class TestStage09MapQualityGate:
+    def test_blocks_real_map2pdb_when_no_half_maps(self, tmp_path: Path) -> None:
+        out = tmp_path / "09"
+        map_path = tmp_path / "map.mrc"
+        map_path.write_bytes(b"\x00" * 10)
+        bundle = stage09_postprocess_gate(
+            out, map_path=map_path, map_exists=True,
+            half_map_1=None, half_map_2=None, mask=None,
+            relion_bin_dir=None, mode="plan-only",
+        )
+        gate = bundle["map_quality_gate"]
+        assert bundle["plan"]["decision"] == "STOP_POSTPROCESS_HALF_MAPS_REQUIRED"
+        assert gate["allow_map2pdb_real"] is False
+        assert gate["fsc_available"] is False
+        assert (out / "map_quality_gate.json").exists()
+        assert (out / "postprocess_plan.md").exists()
+
+    def test_dry_run_writes_plan(self, tmp_path: Path) -> None:
+        out = tmp_path / "09"
+        map_path = tmp_path / "map.mrc"
+        map_path.write_bytes(b"\x00" * 10)
+        h1 = tmp_path / "h1.mrc"; h1.write_bytes(b"\x00")
+        h2 = tmp_path / "h2.mrc"; h2.write_bytes(b"\x00")
+        mask = tmp_path / "mask.mrc"; mask.write_bytes(b"\x00")
+        bundle = stage09_postprocess_gate(
+            out, map_path=map_path, map_exists=True,
+            half_map_1=h1, half_map_2=h2, mask=mask,
+            relion_bin_dir=None, mode="dry-run",
+        )
+        assert bundle["plan"]["decision"] == "PLAN_POSTPROCESS"
+        # No FSC artifacts → still unvalidated.
+        assert bundle["map_quality_gate"]["allow_map2pdb_real"] is False
+
+
+class TestStage10Map2PDBRouting:
+    def _gate(self, allow_real: bool = False, fsc: bool = False) -> Dict[str, Any]:
+        return {
+            "fsc_available": fsc,
+            "allow_map2pdb_real": allow_real,
+            "map_quality_status": "validated" if allow_real else "unvalidated",
+        }
+
+    def test_blocks_when_map_missing(self, tmp_path: Path) -> None:
+        out = tmp_path / "10"
+        routing = stage10_map2pdb_routing(
+            out, map_path=None, map_exists=False, map_source="reconstruct",
+            map_quality_gate=self._gate(), sequence=None,
+            backends=["modelangelo", "emodelx"], mode="dry-run",
+        )
+        assert routing["decision"] == "BLOCK_MAP2PDB_NO_MAP"
+        assert (out / "map2pdb_routing.json").exists()
+
+    def test_records_candidate_backends_when_map_exists(self, tmp_path: Path) -> None:
+        out = tmp_path / "10"
+        map_path = tmp_path / "map.mrc"; map_path.write_bytes(b"\x00")
+        routing = stage10_map2pdb_routing(
+            out, map_path=map_path, map_exists=True, map_source="reconstruct",
+            map_quality_gate=self._gate(), sequence=None,
+            backends=["modelangelo", "emodelx", "mica"], mode="dry-run",
+            availability_overrides={"modelangelo": True, "emodelx": False, "mica": False},
+            allow_without_fsc=True,
+        )
+        assert routing["candidate_backends"] == ["modelangelo", "emodelx", "mica"]
+        assert routing["selected_backend"] == "modelangelo"
+        assert routing["decision"] == "ALLOW_MAP2PDB_DRY_RUN"
+
+    def test_real_blocked_when_quality_gate_disallows(self, tmp_path: Path) -> None:
+        out = tmp_path / "10"
+        map_path = tmp_path / "map.mrc"; map_path.write_bytes(b"\x00")
+        routing = stage10_map2pdb_routing(
+            out, map_path=map_path, map_exists=True, map_source="reconstruct",
+            map_quality_gate=self._gate(allow_real=False),
+            sequence=None, backends=["modelangelo"], mode="real",
+            availability_overrides={"modelangelo": True},
+        )
+        assert routing["real_run_allowed"] is False
+        assert routing["decision"] == "STOP_MAP2PDB_QC_REQUIRED"
+
+    def test_no_available_backend(self, tmp_path: Path) -> None:
+        out = tmp_path / "10"
+        map_path = tmp_path / "map.mrc"; map_path.write_bytes(b"\x00")
+        routing = stage10_map2pdb_routing(
+            out, map_path=map_path, map_exists=True, map_source="reconstruct",
+            map_quality_gate=self._gate(), sequence=None,
+            backends=["modelangelo", "emodelx", "mica"], mode="dry-run",
+            availability_overrides={"modelangelo": False, "emodelx": False, "mica": False},
+        )
+        assert routing["decision"] == "BLOCK_MAP2PDB_NO_AVAILABLE_BACKEND"
+
+
+class TestStage11ModelValidationGate:
+    def test_skipped_when_no_model(self, tmp_path: Path) -> None:
+        out = tmp_path / "11"
+        result = stage11_model_validation_gate(
+            out, model_path=None, map_path=None, sequence=None,
+        )
+        assert result["status"] == "skipped"
+        assert result["decision"] == "SKIP_MODEL_VALIDATION_NO_MODEL"
+        assert (out / "model_validation.json").exists()
+
+    def test_planned_when_model_exists(self, tmp_path: Path) -> None:
+        out = tmp_path / "11"
+        model = tmp_path / "model.cif"
+        model.write_text("dummy", encoding="utf-8")
+        result = stage11_model_validation_gate(
+            out, model_path=model, map_path=None, sequence=None,
+        )
+        assert result["status"] == "planned"
+        assert result["decision"] == "PLAN_MODEL_VALIDATION"
+
+
+# ---------------------------------------------------------------------------
+# Full-pipeline downstream integration tests
+# ---------------------------------------------------------------------------
+
+
+class TestPipelineDownstreamIntegration:
+    def test_workflow_summary_includes_new_stages(self, tmp_path: Path) -> None:
+        pairs_csv = _make_pairs_csv(tmp_path, n=2)
+        out_root = tmp_path / "pipeline_out"
+        main([
+            "--pairs-csv", str(pairs_csv),
+            "--out-root", str(out_root),
+            "--limit", "2",
+            "--dry-run",
+        ])
+        summary = json.loads((out_root / "workflow_summary.json").read_text())
+        for stage in ("07_class2d", "08_refine3d", "09_postprocess",
+                      "10_map2pdb_routing", "11_model_validation"):
+            assert stage in summary["stage_status"]
+        for sub in ("class2d", "refine3d", "postprocess", "map_quality_gate",
+                    "map2pdb_routing", "model_validation", "final_readiness"):
+            assert sub in summary
+
+    def test_new_output_directories_created(self, tmp_path: Path) -> None:
+        pairs_csv = _make_pairs_csv(tmp_path, n=2)
+        out_root = tmp_path / "pipeline_out"
+        main([
+            "--pairs-csv", str(pairs_csv),
+            "--out-root", str(out_root),
+            "--limit", "2",
+            "--dry-run",
+        ])
+        for sub in ("05_class2d", "06_refine3d", "07_postprocess",
+                    "08_map2pdb_routing", "09_model_validation"):
+            assert (out_root / sub).is_dir(), f"{sub} missing"
+
+    def test_final_readiness_map_qc_required_when_reconstruction_present(
+        self, tmp_path: Path
+    ) -> None:
+        pairs_csv = _make_pairs_csv(tmp_path, n=2)
+        out_root = tmp_path / "pipeline_out"
+        relion_bin = tmp_path / "relion_bin"
+        relion_bin.mkdir(parents=True, exist_ok=True)
+
+        def fake_stage03(**kwargs: Any) -> Dict[str, Any]:
+            out_dir = kwargs["out_dir"]
+            _make_converted_coords(out_dir, n=2)
+            return {
+                "mode": "real_run", "returncode": 0, "f1": 0.65, "precision": 0.7,
+                "recall": 0.6, "predicted_count": 84879, "gt_count": 84879,
+                "matched_count": 50000, "qc_passed": True,
+            }
+
+        def fake_run(cmd: List[str], log_path: Path, cwd=None, env=None) -> Dict[str, Any]:
+            if "relion_preprocess" in cmd[0]:
+                ps = Path(cwd) / "Extract" / "job002_log" / "particles.star"
+                ps.parent.mkdir(parents=True, exist_ok=True)
+                ps.write_text(
+                    "data_\n\nloop_\n_rlnImageName #1\n001@Extract/job002_log/Particles/mic.mrcs\n",
+                    encoding="utf-8",
+                )
+            if "relion_reconstruct" in cmd[0]:
+                map_path = Path(cmd[cmd.index("--o") + 1])
+                map_path.parent.mkdir(parents=True, exist_ok=True)
+                map_path.write_bytes(b"\x00" * 1024)
+            return {"returncode": 0, "runtime_sec": 0.1, "log": str(log_path),
+                    "has_error_pattern": False}
+
+        with patch(
+            "run_empiar10017_closed_loop_picker_to_reconstruction.stage03_relion_log_rerun",
+            side_effect=fake_stage03,
+        ), patch(
+            "run_empiar10017_closed_loop_picker_to_reconstruction._run_cmd",
+            side_effect=fake_run,
+        ):
+            main([
+                "--pairs-csv", str(pairs_csv),
+                "--relion-bin-dir", str(relion_bin),
+                "--out-root", str(out_root),
+                "--limit", "2",
+            ])
+
+        summary = json.loads((out_root / "workflow_summary.json").read_text())
+        assert summary["reconstruction"]["map_exists"] is True
+        # No FSC, no half maps → must not allow real map2pdb run.
+        assert summary["map_quality_gate"]["allow_map2pdb_real"] is False
+        assert summary["map2pdb_routing"]["real_run_allowed"] is False
+        # Final readiness must not claim full structure determination.
+        assert summary["final_readiness"] in (
+            "MAP_QC_REQUIRED", "MAP2PDB_READY_DRY_RUN_ONLY",
+        )
+        # Model validation must be skipped because no model exists.
+        assert summary["model_validation"]["decision"] == \
+            "SKIP_MODEL_VALIDATION_NO_MODEL"
+        md = (out_root / "workflow_summary.md").read_text()
+        assert "final structure determination" not in md.lower() or \
+            "not" in md.lower()
