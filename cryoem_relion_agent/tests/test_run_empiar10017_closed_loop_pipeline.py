@@ -1084,3 +1084,85 @@ class TestPipelineDownstreamIntegration:
         md = (out_root / "workflow_summary.md").read_text()
         assert "final structure determination" not in md.lower() or \
             "not" in md.lower()
+
+
+class TestPipelineDryRunRobustness:
+    def test_pipeline_dry_run_continues_after_stage02_stop_plan_only(
+        self, tmp_path: Path
+    ) -> None:
+        """Stage02 returning STOP_PLAN_ONLY_NO_VIABLE_PICKER must not abort the pipeline."""
+        pairs_csv = _make_pairs_csv(tmp_path, n=3)
+        out_root = tmp_path / "pipeline_out"
+
+        def fake_stage02(**kwargs: Any) -> Dict[str, Any]:
+            return {
+                "final": {
+                    "selected": "relion_log_autopick",
+                    "final_action": "STOP_PLAN_ONLY_NO_VIABLE_PICKER",
+                },
+                "candidates": [], "selection": {}, "plan": {}, "comparison_rows": [],
+                "relion_rerun": None,
+            }
+
+        with patch(
+            "run_empiar10017_closed_loop_picker_to_reconstruction.stage02_picker_fallback_selection",
+            side_effect=fake_stage02,
+        ):
+            main([
+                "--pairs-csv", str(pairs_csv),
+                "--out-root", str(out_root),
+                "--limit", "3",
+                "--downstream-mode", "plan-only",
+                "--map2pdb-mode", "dry-run",
+                "--dry-run",
+            ])
+
+        # Final summary written even though stage02 reported a STOP candidate.
+        assert (out_root / "workflow_summary.json").exists()
+        assert (out_root / "workflow_summary.md").exists()
+        assert (out_root / "05_class2d" / "class2d_plan.json").exists()
+        assert (out_root / "06_refine3d" / "refine3d_plan.json").exists()
+        assert (out_root / "07_postprocess" / "map_quality_gate.json").exists()
+        assert (out_root / "08_map2pdb_routing" / "map2pdb_routing.json").exists()
+        assert (out_root / "09_model_validation" / "model_validation.json").exists()
+
+        summary = json.loads((out_root / "workflow_summary.json").read_text())
+        assert summary["picker_selection"]["stage02_final_action"] == \
+            "STOP_PLAN_ONLY_NO_VIABLE_PICKER"
+        # Pipeline status is not aborted: all stage_status keys present.
+        for k in ("07_class2d", "08_refine3d", "09_postprocess",
+                  "10_map2pdb_routing", "11_model_validation"):
+            assert k in summary["stage_status"]
+        # Stages 05/06 must be skipped in dry-run, not failed.
+        assert summary["stage_status"]["05_extraction"] in ("skipped", "dry_run")
+        assert summary["stage_status"]["06_reconstruction"] in ("skipped", "dry_run")
+        assert summary["final_readiness"] in (
+            "WORKFLOW_HANDOFF_ONLY", "MAP_QC_REQUIRED",
+        )
+
+    def test_pipeline_writes_summary_even_when_stage03_raises(
+        self, tmp_path: Path
+    ) -> None:
+        pairs_csv = _make_pairs_csv(tmp_path, n=2)
+        out_root = tmp_path / "pipeline_out"
+
+        def boom(**kwargs: Any) -> Dict[str, Any]:
+            raise RuntimeError("synthetic stage03 failure")
+
+        with patch(
+            "run_empiar10017_closed_loop_picker_to_reconstruction.stage03_relion_log_rerun",
+            side_effect=boom,
+        ):
+            main([
+                "--pairs-csv", str(pairs_csv),
+                "--out-root", str(out_root),
+                "--limit", "2",
+                "--dry-run",
+            ])
+
+        assert (out_root / "workflow_summary.json").exists()
+        summary = json.loads((out_root / "workflow_summary.json").read_text())
+        # Stage07-11 still ran and wrote artifacts.
+        assert (out_root / "05_class2d" / "class2d_plan.json").exists()
+        assert (out_root / "08_map2pdb_routing" / "map2pdb_routing.json").exists()
+        assert "stage03" in summary["args"].get("stage_errors", {})

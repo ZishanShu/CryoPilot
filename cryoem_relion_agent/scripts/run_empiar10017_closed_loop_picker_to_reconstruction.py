@@ -1056,22 +1056,49 @@ def main(argv: Optional[List[str]] = None) -> None:
 
     print(f"[pipeline] out_root={out_root}", flush=True)
 
+    stage_errors: Dict[str, str] = {}
+
+    def _safe(stage_name: str, func, *, default: Any, **kwargs):
+        try:
+            return func(**kwargs)
+        except Exception as exc:  # noqa: BLE001
+            import traceback as _tb
+            stage_errors[stage_name] = f"{type(exc).__name__}: {exc}"
+            _tb.print_exc()
+            print(f"[{stage_name}] FAILED: {exc}", flush=True)
+            return default
+
     # -- Stage 01 ----------------------------------------------------------------
-    evidence = stage01_record_topaz_evidence(
-        dir_01,
-        args.topaz_failed_evidence_json,
+    evidence = _safe(
+        "stage01", stage01_record_topaz_evidence,
+        default={"picking_qc_passed": False, "qc_threshold_f1": args.qc_threshold_f1},
+        out_dir=dir_01,
+        topaz_evidence_json=args.topaz_failed_evidence_json,
         qc_threshold_f1=args.qc_threshold_f1,
     )
 
     # -- Stage 02 ----------------------------------------------------------------
-    selection_result = stage02_picker_fallback_selection(
+    selection_result = _safe(
+        "stage02", stage02_picker_fallback_selection,
+        default={"final": {"selected": None, "final_action": "STAGE02_FAILED"}},
         evidence=evidence,
         out_dir=dir_01,
         relion_autopick_bin=args.relion_autopick_bin,
     )
+    # Stage 02 is candidate selection only.  Stage 03 is the source of truth
+    # for RELION LoG rerun/evaluation; never abort the pipeline here even if
+    # Stage 02 returns STOP_PLAN_ONLY_NO_VIABLE_PICKER.
 
     # -- Stage 03 ----------------------------------------------------------------
-    relion_result = stage03_relion_log_rerun(
+    relion_result = _safe(
+        "stage03", stage03_relion_log_rerun,
+        default={
+            "mode": "dry_run" if args.dry_run else "skipped_execution",
+            "f1": None, "precision": None, "recall": None,
+            "predicted_count": 0, "gt_count": 0, "matched_count": 0,
+            "qc_passed": None, "qc_threshold_f1": args.qc_threshold_f1,
+            "skipped": True, "status": "planned",
+        },
         pairs_csv=args.pairs_csv,
         out_dir=dir_02,
         relion_autopick_bin=args.relion_autopick_bin,
@@ -1083,7 +1110,13 @@ def main(argv: Optional[List[str]] = None) -> None:
     )
 
     # -- Stage 04 ----------------------------------------------------------------
-    extract_manifest = stage04_materialise_extract_project(
+    extract_manifest = _safe(
+        "stage04", stage04_materialise_extract_project,
+        default={
+            "n_micrographs": 0, "n_box_files": 0,
+            "status": "planned",
+            "decision": "SKIP_MATERIALIZATION_DRY_RUN_NO_COORDS",
+        },
         pairs_csv=args.pairs_csv,
         relion_log_out=dir_02,
         out_dir=dir_03,
@@ -1092,9 +1125,24 @@ def main(argv: Optional[List[str]] = None) -> None:
         dry_run=args.dry_run,
         extract_size=args.extract_size,
     )
+    # Annotate the manifest when no coords were converted in a dry-run.
+    if args.dry_run and isinstance(extract_manifest, dict) \
+            and not extract_manifest.get("decision") \
+            and (extract_manifest.get("n_converted_coord_files", 0) == 0):
+        extract_manifest["status"] = "planned"
+        extract_manifest["decision"] = "SKIP_MATERIALIZATION_DRY_RUN_NO_COORDS"
+        try:
+            _write_json(dir_03 / "extract_project_manifest.json", extract_manifest)
+        except Exception:
+            pass
 
     # -- Stage 05 ----------------------------------------------------------------
-    extract_result = stage05_extract(
+    extract_result = _safe(
+        "stage05", stage05_extract,
+        default={
+            "dry_run": args.dry_run, "skipped": True,
+            "n_particles": 0, "particles_star": None, "returncode": None,
+        },
         extract_project_dir=dir_03,
         relion_bin_dir=relion_bin_dir,
         extract_size=args.extract_size,
@@ -1104,18 +1152,27 @@ def main(argv: Optional[List[str]] = None) -> None:
     )
 
     # -- Stage 06 ----------------------------------------------------------------
-    recon_result = stage06_reconstruct(
+    recon_result = _safe(
+        "stage06", stage06_reconstruct,
+        default={
+            "dry_run": args.dry_run, "skipped": True,
+            "map_exists": False, "map_path": None,
+        },
         extract_project_dir=dir_03,
         recon_out_dir=dir_04,
         relion_bin_dir=relion_bin_dir,
-        n_particles=extract_result.get("n_particles", 0),
+        n_particles=int((extract_result or {}).get("n_particles", 0) or 0),
         dry_run=args.dry_run,
         env=env,
     )
 
+    # Stages 07-11 are gate writers that always run.
+
     # -- Stage 07: Class2D ------------------------------------------------------
-    class2d_result = _stage07_class2d(
-        dir_05,
+    class2d_result = _safe(
+        "stage07", _stage07_class2d,
+        default={"status": "blocked", "decision": "STAGE07_FAILED"},
+        out_dir=dir_05,
         extract_result=extract_result,
         relion_bin_dir=relion_bin_dir,
         mode=class2d_mode,
@@ -1127,8 +1184,10 @@ def main(argv: Optional[List[str]] = None) -> None:
           f"decision={class2d_result.get('decision')}", flush=True)
 
     # -- Stage 08: Refine3D -----------------------------------------------------
-    refine3d_result = _stage08_refine3d(
-        dir_06,
+    refine3d_result = _safe(
+        "stage08", _stage08_refine3d,
+        default={"status": "blocked", "decision": "STAGE08_FAILED"},
+        out_dir=dir_06,
         extract_result=extract_result,
         recon_result=recon_result,
         relion_bin_dir=relion_bin_dir,
@@ -1140,8 +1199,18 @@ def main(argv: Optional[List[str]] = None) -> None:
           f"decision={refine3d_result.get('decision')}", flush=True)
 
     # -- Stage 09: Postprocess / FSC --------------------------------------------
-    postprocess_bundle = _stage09_postprocess(
-        dir_07,
+    postprocess_bundle = _safe(
+        "stage09", _stage09_postprocess,
+        default={
+            "plan": {"status": "blocked", "decision": "STAGE09_FAILED"},
+            "map_quality_gate": {
+                "map_quality_status": "blocked",
+                "allow_map2pdb_real": False,
+                "decision": "STOP_MAP_QC_REQUIRED",
+                "fsc_available": False,
+            },
+        },
+        out_dir=dir_07,
         recon_result=recon_result,
         half_map_1=args.half_map_1,
         half_map_2=args.half_map_2,
@@ -1156,8 +1225,14 @@ def main(argv: Optional[List[str]] = None) -> None:
           f"decision={map_quality_gate.get('decision')}", flush=True)
 
     # -- Stage 10: Map-to-PDB routing -------------------------------------------
-    routing = _stage10_map2pdb(
-        dir_08,
+    routing = _safe(
+        "stage10", _stage10_map2pdb,
+        default={
+            "status": "blocked", "decision": "STAGE10_FAILED",
+            "real_run_allowed": False, "selected_backend": None,
+            "candidate_backends": backends_list,
+        },
+        out_dir=dir_08,
         recon_result=recon_result,
         map_quality_gate=map_quality_gate,
         sequence=args.sequence,
@@ -1170,8 +1245,10 @@ def main(argv: Optional[List[str]] = None) -> None:
           f"decision={routing.get('decision')}", flush=True)
 
     # -- Stage 11: Model validation ---------------------------------------------
-    model_validation = _stage11_model_validation(
-        dir_09,
+    model_validation = _safe(
+        "stage11", _stage11_model_validation,
+        default={"status": "skipped", "decision": "SKIP_MODEL_VALIDATION_NO_MODEL"},
+        out_dir=dir_09,
         routing=routing,
         recon_result=recon_result,
         sequence=args.sequence,
@@ -1185,35 +1262,55 @@ def main(argv: Optional[List[str]] = None) -> None:
         routing=routing,
         model_validation=model_validation,
     )
+    if stage_errors:
+        args_dict["stage_errors"] = stage_errors
 
-    # -- Stage 12: workflow summary ---------------------------------------------
-    summary = stage07_write_summary(
-        out_root=out_root,
-        evidence=evidence,
-        selection_result=selection_result,
-        relion_result=relion_result,
-        extract_manifest=extract_manifest,
-        extract_result=extract_result,
-        recon_result=recon_result,
-        pairs_csv=args.pairs_csv,
-        args_dict=args_dict,
-        class2d_result=class2d_result,
-        refine3d_result=refine3d_result,
-        postprocess_result=postprocess_bundle,
-        map_quality_gate=map_quality_gate,
-        map2pdb_routing=routing,
-        model_validation=model_validation,
-        final_readiness=final_readiness,
-    )
+    # -- Stage 12: workflow summary (always written) ----------------------------
+    try:
+        summary = stage07_write_summary(
+            out_root=out_root,
+            evidence=evidence,
+            selection_result=selection_result,
+            relion_result=relion_result,
+            extract_manifest=extract_manifest,
+            extract_result=extract_result,
+            recon_result=recon_result,
+            pairs_csv=args.pairs_csv,
+            args_dict=args_dict,
+            class2d_result=class2d_result,
+            refine3d_result=refine3d_result,
+            postprocess_result=postprocess_bundle,
+            map_quality_gate=map_quality_gate,
+            map2pdb_routing=routing,
+            model_validation=model_validation,
+            final_readiness=final_readiness,
+        )
+    except Exception as exc:  # noqa: BLE001
+        import traceback as _tb
+        _tb.print_exc()
+        # Emergency minimal summary so downstream consumers still find a file.
+        summary = {
+            "pipeline": "empiar10017_closed_loop_picker_to_reconstruction",
+            "args": args_dict,
+            "stage_errors": {**stage_errors, "stage12": str(exc)},
+            "final_readiness": final_readiness,
+            "relion_log_rerun": {"f1": None, "qc_passed": None},
+            "reconstruction": {"map_exists": False},
+        }
+        _write_json(out_root / "workflow_summary.json", summary)
+        _write_text(out_root / "workflow_summary.md",
+                    "# EMPIAR-10017 workflow summary\n\n"
+                    f"Stage 12 failed to render full summary: {exc}\n")
 
     print(json.dumps({
-        "status": "ok",
+        "status": "ok" if not stage_errors else "ok_with_stage_errors",
         "out_root": str(out_root),
         "workflow_summary": str(out_root / "workflow_summary.json"),
-        "relion_log_f1": summary["relion_log_rerun"]["f1"],
-        "qc_passed": summary["relion_log_rerun"]["qc_passed"],
-        "reconstruction_map_exists": summary["reconstruction"]["map_exists"],
-        "final_readiness": summary["final_readiness"],
+        "relion_log_f1": summary.get("relion_log_rerun", {}).get("f1"),
+        "qc_passed": summary.get("relion_log_rerun", {}).get("qc_passed"),
+        "reconstruction_map_exists": summary.get("reconstruction", {}).get("map_exists", False),
+        "final_readiness": summary.get("final_readiness"),
+        "stage_errors": stage_errors or None,
         "dry_run": args.dry_run,
     }, indent=2))
 
