@@ -26,10 +26,12 @@ from run_empiar10017_closed_loop_picker_to_reconstruction import (  # noqa: E402
     stage01_record_topaz_evidence,
     stage02_picker_fallback_selection,
     stage03_relion_log_rerun,
+    stage03_deposited_coords_handoff,
     stage04_materialise_extract_project,
     stage05_extract,
     stage06_reconstruct,
     stage07_write_summary,
+    _parse_eman_box_xywh_to_centers,
 )
 
 
@@ -46,11 +48,19 @@ def _make_pairs_csv(tmp_path: Path, n: int = 3) -> Path:
             "micrograph_id": f"mic_{i:04d}",
             "micrograph_path": str(tmp_path / "micrographs" / f"mic_{i:04d}.mrc"),
             "gt_coord_path": str(tmp_path / "gt_coords" / f"mic_{i:04d}.coord"),
+            "coord_path": str(tmp_path / "gt_coords" / f"mic_{i:04d}.coord"),
+            "local_coord_path": str(tmp_path / "gt_coords" / f"mic_{i:04d}.coord"),
         }
         for i in range(n)
     ]
     with pairs_csv.open("w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=["micrograph_id", "micrograph_path", "gt_coord_path"])
+        writer = csv.DictWriter(
+            fh,
+            fieldnames=[
+                "micrograph_id", "micrograph_path", "gt_coord_path",
+                "coord_path", "local_coord_path",
+            ],
+        )
         writer.writeheader()
         writer.writerows(rows)
     return pairs_csv
@@ -199,6 +209,12 @@ class TestStage02PickerFallbackSelection:
 
 
 class TestStage03RelionLogRerun:
+    def test_parse_eman_box_to_center_coords(self, tmp_path: Path) -> None:
+        box = tmp_path / "a.box"
+        box.write_text("10 20 100 80\n", encoding="utf-8")
+        centers = _parse_eman_box_xywh_to_centers(box)
+        assert centers == [(60.0, 60.0)]
+
     def test_dry_run_returns_bundle(self, tmp_path: Path) -> None:
         pairs_csv = _make_pairs_csv(tmp_path)
         out = tmp_path / "rerun"
@@ -216,6 +232,27 @@ class TestStage03RelionLogRerun:
         assert result["qc_threshold_f1"] == 0.2
         assert "qc_passed" in result
         assert (out / "relion_log_autopick_result.json").exists()
+
+    def test_deposited_coords_handoff_materializes_coords(self, tmp_path: Path) -> None:
+        pairs_csv = _make_pairs_csv(tmp_path, n=2)
+        _make_gt_coords(tmp_path, n=2)
+        dep_out = tmp_path / "02_deposited_coords"
+        relion_out = tmp_path / "02_relion_log_rerun"
+        result = stage03_deposited_coords_handoff(
+            pairs_csv=pairs_csv,
+            out_dir=dep_out,
+            relion_log_out=relion_out,
+            limit=2,
+            qc_threshold_f1=0.2,
+        )
+        assert result["picking_source"] == "deposited_coords"
+        assert result["reference_coordinate_handoff"] is True
+        assert (dep_out / "deposited_coords_result.json").exists()
+        assert (dep_out / "deposited_coords_result.md").exists()
+        assert (relion_out / "converted_coords" / "mic_0000.coord").exists()
+        assert (relion_out / "converted_coords" / "mic_0001.coord").exists()
+        converted_text = (relion_out / "converted_coords" / "mic_0000.coord").read_text(encoding="utf-8")
+        assert "image_name x_coord y_coord score" in converted_text
 
     def test_real_run_with_mock_runner_and_autopick_stars(self, tmp_path: Path) -> None:
         pairs_csv = _make_pairs_csv(tmp_path, n=3)
@@ -330,7 +367,26 @@ class TestStage04MaterialiseExtractProject:
         assert manifest["n_box_files"] == 4
         assert manifest["coord_source"] == "relion_log_converted_coords"
 
-    def test_manifest_written(self, tmp_path: Path) -> None:
+    def test_manifest_records_missing_coord_zero_for_deposited(self, tmp_path: Path) -> None:
+        pairs_csv = _make_pairs_csv(tmp_path, n=2)
+        _make_gt_coords(tmp_path, n=2)
+        relion_log_out = tmp_path / "rerun"
+        _make_converted_coords(relion_log_out, n=2)
+
+        out = tmp_path / "extract"
+        manifest = stage04_materialise_extract_project(
+            pairs_csv=pairs_csv,
+            relion_log_out=relion_log_out,
+            out_dir=out,
+            limit=2,
+            pixel_size_angstrom=1.0,
+            dry_run=True,
+            extract_size=200,
+            coord_source="deposited_coords",
+        )
+        assert manifest["n_missing_coord"] == 0
+        assert manifest["coord_source"] == "deposited_coords"
+
         pairs_csv = _make_pairs_csv(tmp_path, n=2)
         out = tmp_path / "extract"
         stage04_materialise_extract_project(
@@ -386,6 +442,9 @@ class TestStage05Extract:
         project = extract_dir / "relion_project"
         project.mkdir(parents=True)
         (project / "micrographs.star").write_text("", encoding="utf-8")
+        cdir = project / "Coords" / "Micrographs"
+        cdir.mkdir(parents=True, exist_ok=True)
+        (cdir / "mic_0000.box").write_text("0 0 256 256\n", encoding="utf-8")
 
         called_cmds: List[List[str]] = []
 
@@ -450,6 +509,20 @@ class TestStage06Reconstruct:
         )
         assert result["skipped"] is True
         assert result["map_exists"] is False
+
+    def test_abnormal_particle_size_blocks_reconstruction(self, tmp_path: Path) -> None:
+        extract_dir = tmp_path / "extract"
+        recon_dir = tmp_path / "recon"
+        result = stage06_reconstruct(
+            extract_project_dir=extract_dir,
+            recon_out_dir=recon_dir,
+            relion_bin_dir=tmp_path / "relion_bin",
+            n_particles=10,
+            extract_result={"decision": "BLOCK_RECONSTRUCTION_ABNORMAL_PARTICLE_SIZE"},
+            dry_run=False,
+        )
+        assert result["skipped"] is True
+        assert result["decision"] == "BLOCK_RECONSTRUCTION_ABNORMAL_PARTICLE_SIZE"
 
     def test_real_run_calls_relion_reconstruct(self, tmp_path: Path) -> None:
         extract_dir = tmp_path / "extract"
@@ -579,7 +652,30 @@ class TestStage07WriteSummary:
         assert summary["picker_selection"]["selected_picker"] == "relion_log_autopick"
         assert summary["picker_selection"]["stage02_selected_picker"] == "STOP_PLAN_ONLY_NO_VIABLE_PICKER"
 
-    def test_scientific_caveat_in_md(self, tmp_path: Path) -> None:
+    def test_summary_records_reference_coordinate_handoff(self, tmp_path: Path) -> None:
+        r = self._make_results()
+        r["relion_result"].update({
+            "picking_source": "deposited_coords",
+            "automatic_picking": False,
+            "reference_coordinate_handoff": True,
+            "qc_passed": True,
+        })
+        summary = stage07_write_summary(
+            out_root=tmp_path,
+            evidence=r["evidence"],
+            selection_result=r["selection_result"],
+            relion_result=r["relion_result"],
+            extract_manifest=r["extract_manifest"],
+            extract_result={"n_particles": 2, "returncode": 0},
+            recon_result={"map_exists": True, "map_path": "/tmp/x.mrc"},
+            pairs_csv=tmp_path / "pairs.csv",
+            args_dict={"dry_run": False, "picker_source": "deposited_coords"},
+        )
+        assert summary["picker_source"] == "deposited_coords"
+        assert summary["relion_log_rerun"]["reference_coordinate_handoff"] is True
+        assert summary["relion_log_rerun"]["automatic_picking"] is False
+        assert summary["full_workflow_execution"] is True
+
         r = self._make_results()
         stage07_write_summary(
             out_root=tmp_path,
