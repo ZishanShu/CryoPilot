@@ -1,0 +1,17 @@
+{
+  "command": [],
+  "error": "pairs_csv missing or not found",
+  "evaluation_available": false,
+  "f1": null,
+  "gt_count": 0,
+  "matched_count": 0,
+  "mode": "dry_run",
+  "output_root": "/home/user/CryoAgent/real_runs/empiar10017_unified_downstream_gates_full84_real_v3/01_picker_selection/reruns/relion_log_autopick",
+  "precision": null,
+  "predicted_count": 0,
+  "recall": null,
+  "returncode": null,
+  "runtime_sec": 0.0,
+  "stderr": null,
+  "stdout": null
+}

@@ -1,0 +1,26 @@
+{
+  "executes": true,
+  "plan_only": false,
+  "selection": {
+    "candidate": {
+      "evidence": {
+        "relion_autopick_mpi_present": false,
+        "relion_autopick_present": true
+      },
+      "kind": "rule_based_log_picker",
+      "name": "relion_log_autopick",
+      "notes": "RELION LoG/autopick available; can produce real coordinates and be evaluated with the existing F1 evaluator.",
+      "status": "available"
+    },
+    "final_action": "RUN_ALTERNATIVE_PICKER",
+    "reason": "Selected relion_log_autopick (available) per priority order.",
+    "selected": "relion_log_autopick"
+  },
+  "trigger": {
+    "picking_qc_passed": false,
+    "previous_backend": "topaz_t-4",
+    "qc_threshold_f1": 0.2,
+    "selected_micro_f1": 0.031848,
+    "selection_metric": "picking_micro_f1"
+  }
+}

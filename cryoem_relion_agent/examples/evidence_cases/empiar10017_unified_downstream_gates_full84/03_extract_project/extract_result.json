@@ -1,0 +1,32 @@
+{
+  "cmd": [
+    "/home/user/conda_envs/relion/bin/relion_preprocess",
+    "--i",
+    "micrographs.star",
+    "--coord_dir",
+    "Coords",
+    "--coord_suffix",
+    ".box",
+    "--part_dir",
+    "Extract/job002_log/Particles/",
+    "--part_star",
+    "Extract/job002_log/particles.star",
+    "--extract",
+    "--extract_size",
+    "256",
+    "--bg_radius",
+    "100",
+    "--norm",
+    "--white_dust",
+    "-1",
+    "--black_dust",
+    "-1"
+  ],
+  "dry_run": false,
+  "log": "/home/user/CryoAgent/real_runs/empiar10017_unified_downstream_gates_full84_real_v3/03_extract_project/logs/relion_preprocess.log",
+  "n_particle_stacks": 84,
+  "n_particles": 84879,
+  "particles_star": "/home/user/CryoAgent/real_runs/empiar10017_unified_downstream_gates_full84_real_v3/03_extract_project/relion_project/Extract/job002_log/particles.star",
+  "returncode": 0,
+  "runtime_sec": 106.721
+}

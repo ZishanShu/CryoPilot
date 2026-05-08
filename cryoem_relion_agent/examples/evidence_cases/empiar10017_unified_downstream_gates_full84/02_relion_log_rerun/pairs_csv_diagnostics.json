@@ -1,0 +1,31 @@
+{
+  "dropped_reasons": {},
+  "fieldnames": [
+    "micrograph_id",
+    "mrc_path",
+    "coord_path",
+    "local_mrc_path",
+    "local_coord_path",
+    "n_gt_particles",
+    "mrc_size_bytes",
+    "coord_exists"
+  ],
+  "first_raw_row": {
+    "coord_exists": "True",
+    "coord_path": "/home/user/CryoAgent/data/empiar/EMPIAR-10017/data/Falcon_2012_06_12-14_33_35_0.coord",
+    "local_coord_path": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-14_33_35_0.coord",
+    "local_mrc_path": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-14_33_35_0.mrc",
+    "micrograph_id": "Falcon_2012_06_12-14_33_35_0",
+    "mrc_path": "/home/user/CryoAgent/data/empiar/EMPIAR-10017/data/Falcon_2012_06_12-14_33_35_0.mrc",
+    "mrc_size_bytes": "67109888",
+    "n_gt_particles": "632"
+  },
+  "first_usable_row": {
+    "gt_coord_path": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-14_33_35_0.coord",
+    "micrograph_id": "Falcon_2012_06_12-14_33_35_0",
+    "micrograph_path": "/home/user/CryoAgent/real_runs/empiar10017_picking_full/input/Falcon_2012_06_12-14_33_35_0.mrc"
+  },
+  "n_rows_dropped": 0,
+  "n_rows_raw": 84,
+  "n_rows_usable": 84
+}
