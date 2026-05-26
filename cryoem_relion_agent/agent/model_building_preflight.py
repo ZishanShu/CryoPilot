@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 import yaml
 
-from agent.backend_runtime import check_path_access
+from agent.backend_runtime import _expand_config_tree, check_path_access
 from agent.backend_registry import (
     MODEL_BUILDING_BACKEND_METADATA,
     MODEL_BUILDING_INPUT_SPECS,
@@ -34,7 +34,7 @@ def _load_emodelx_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
     if not p.is_file():
         return {}
     try:
-        data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+        data = _expand_config_tree(yaml.safe_load(p.read_text(encoding="utf-8")) or {})
         return data if isinstance(data, dict) else {}
     except (OSError, yaml.YAMLError):
         return {}
@@ -60,7 +60,7 @@ def _load_modelangelo_config(config_path: Optional[Path] = None) -> Dict[str, An
         if not isinstance(data, dict):
             return {}
         section = data.get("model_angelo") or data.get("modelangelo") or {}
-        return section if isinstance(section, dict) else {}
+        return _expand_config_tree(section) if isinstance(section, dict) else {}
     except (OSError, yaml.YAMLError):
         return {}
 

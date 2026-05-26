@@ -478,12 +478,12 @@ class RelionActionExecutor:
                 ):
                     out: Dict[str, Any] = {
                         "action_name": name,
-                        "status": "preflight_blocked",
+                        "status": "dry_run" if dry_run else "blocked",
                         "dry_run": dry_run,
-                        "success": False,
+                        "success": bool(dry_run),
                         "command": None,
                         "return_code": None,
-                        "stdout": "",
+                        "stdout": "[DRY-RUN] Real run would be blocked by model_building preflight." if dry_run else "",
                         "stderr": "",
                         "error_message": str(
                             (action.parameters or {}).get("model_building_blocked_reason")
@@ -825,7 +825,7 @@ class RelionActionExecutor:
                         act = action.model_copy(update={"parameters": params})
                     else:
                         act = action
-                    if _model_building_preflight_blocked(act):
+                    if _model_building_preflight_blocked(act) and not dry_run:
                         out = {
                             "action_name": name,
                             "status": "preflight_blocked",
@@ -905,7 +905,7 @@ class RelionActionExecutor:
                         act = action.model_copy(update={"parameters": params})
                     else:
                         act = action
-                    if _model_building_preflight_blocked(act):
+                    if _model_building_preflight_blocked(act) and not dry_run:
                         out = {
                             "action_name": name,
                             "status": "preflight_blocked",
@@ -967,7 +967,7 @@ class RelionActionExecutor:
                     _merge_model_building_preflight_fields(out, act)
                     return out
 
-                if _model_building_preflight_blocked(action):
+                if _model_building_preflight_blocked(action) and not dry_run:
                     out = {
                         "action_name": name,
                         "status": "preflight_blocked",

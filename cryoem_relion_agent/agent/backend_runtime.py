@@ -11,7 +11,6 @@ import getpass
 import os
 import re
 import shutil
-import stat
 import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
@@ -36,6 +35,86 @@ _TEXT_SUFFIXES = {
     ".yaml",
     ".yml",
 }
+_VAR_DEFAULT_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*):-([^}]+)\}")
+
+
+def _expand_config_value(value: Any) -> Any:
+    """Expand env vars, ``~``, and a small bash-like ``${VAR:-default}`` subset."""
+    if not isinstance(value, str):
+        return value
+    text = value
+    if "CRYOAGENT_ROOT" not in os.environ:
+        repo_root = str(Path(__file__).resolve().parents[2])
+        text = text.replace("${CRYOAGENT_ROOT}", repo_root).replace("$CRYOAGENT_ROOT", repo_root)
+    for _ in range(5):
+        new = _VAR_DEFAULT_RE.sub(lambda m: os.environ.get(m.group(1), m.group(2)), text)
+        if new == text:
+            break
+        text = new
+    return os.path.expanduser(os.path.expandvars(text))
+
+
+def _expand_config_tree(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {k: _expand_config_tree(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_expand_config_tree(v) for v in value]
+    return _expand_config_value(value)
+
+
+def _status_from_access(access: Optional[Mapping[str, Any]], *, require_executable: bool = False) -> str:
+    if not access:
+        return "missing"
+    if access.get("path_stale"):
+        return "stale_path"
+    if access.get("not_accessible"):
+        return "not_accessible"
+    if not access.get("exists"):
+        return "missing"
+    if require_executable and not access.get("executable"):
+        return "not_executable"
+    return "ok"
+
+
+def _suggested_fix(path_text: Optional[str]) -> str:
+    if not path_text:
+        return "Set the corresponding backend path in config or environment."
+    if _is_under_root(path_text):
+        return "Replace old /root path with the migrated /home/user/CryoAgent or conda_envs path, or set the backend environment variable."
+    return "Create the path, install the backend, or update the backend config/environment variable."
+
+
+def environment_fingerprint() -> Dict[str, Any]:
+    """Small environment snapshot for audit/debug reports."""
+    nvidia = shutil.which("nvidia-smi")
+    torch_cuda: Any = "unavailable"
+    try:
+        import torch  # type: ignore
+
+        torch_cuda = bool(torch.cuda.is_available())
+    except Exception as exc:  # noqa: BLE001
+        torch_cuda = f"unknown: {exc.__class__.__name__}"
+    return {
+        "current_user": getpass.getuser(),
+        "hostname": os.uname().nodename if hasattr(os, "uname") else "",
+        "sys_executable": sys.executable,
+        "conda_prefix": os.environ.get("CONDA_PREFIX"),
+        "path": os.environ.get("PATH", ""),
+        "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
+        "nvidia_smi_available": bool(nvidia),
+        "nvidia_smi_path": nvidia,
+        "torch_cuda_available": torch_cuda,
+    }
+
+
+def _first_access(resolve_result: Mapping[str, Any]) -> Optional[Mapping[str, Any]]:
+    attempts = resolve_result.get("attempts")
+    if not isinstance(attempts, list):
+        return None
+    for attempt in attempts:
+        if isinstance(attempt, Mapping) and isinstance(attempt.get("access"), Mapping):
+            return attempt["access"]
+    return None
 
 
 def _stringify_path(path: Any) -> Optional[str]:
@@ -123,26 +202,47 @@ def resolve_executable(
     *,
     default_names: Sequence[str] = (),
     env_var: Optional[str] = None,
+    env_vars: Sequence[str] = (),
+    candidate_dirs: Sequence[Any] = (),
 ) -> Dict[str, Any]:
     """Resolve an executable from an explicit path/name, env var, or PATH."""
     attempts: List[Dict[str, Any]] = []
     candidates: List[Tuple[str, str]] = []
     if executable and str(executable).strip():
-        candidates.append(("explicit", str(executable).strip()))
+        candidates.append(("explicit", str(_expand_config_value(str(executable).strip()))))
     if env_var and os.environ.get(env_var):
-        candidates.append((f"env:{env_var}", str(os.environ[env_var]).strip()))
+        candidates.append((f"env:{env_var}", str(_expand_config_value(os.environ[env_var].strip()))))
+    for ev in env_vars:
+        if ev and os.environ.get(ev):
+            candidates.append((f"env:{ev}", str(_expand_config_value(os.environ[ev].strip()))))
     for name in default_names:
         if name and str(name).strip():
             candidates.append(("path", str(name).strip()))
+    for d in candidate_dirs:
+        d_text = _stringify_path(_expand_config_value(d))
+        if not d_text:
+            continue
+        for name in default_names:
+            if name and str(name).strip():
+                candidates.append(("candidate_dir", str(Path(d_text) / str(name).strip())))
 
+    seen_candidates: set[Tuple[str, str]] = set()
     for source, raw in candidates:
+        key = (source, raw)
+        if key in seen_candidates:
+            continue
+        seen_candidates.add(key)
         p = Path(raw).expanduser()
         if p.parent != Path(".") or raw.startswith(("~", "/")):
             access = check_path_access(str(p))
             attempts.append({"source": source, "candidate": raw, "access": access})
             if access.get("exists") and access.get("is_file") and access.get("executable"):
+                try:
+                    resolved = str(p.resolve())
+                except (OSError, PermissionError):
+                    resolved = str(p)
                 return {
-                    "resolved": str(p.resolve()),
+                    "resolved": resolved,
                     "available": True,
                     "source": source,
                     "attempts": attempts,
@@ -196,7 +296,7 @@ def _safe_load_yaml(path: Path) -> Dict[str, Any]:
         if not path.is_file():
             return {}
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-        return data if isinstance(data, dict) else {}
+        return _expand_config_tree(data) if isinstance(data, dict) else {}
     except (OSError, yaml.YAMLError):
         return {}
 
@@ -205,10 +305,71 @@ def _config_root(config_root: Optional[Path] = None) -> Path:
     return config_root or (Path(__file__).resolve().parents[1] / "configs")
 
 
+def _env_first(*names: str) -> Optional[str]:
+    for name in names:
+        value = os.environ.get(name)
+        if value and value.strip():
+            return _expand_config_value(value.strip())
+    return None
+
+
 def _modelangelo_config(config_root: Optional[Path] = None) -> Dict[str, Any]:
     data = _safe_load_yaml(_config_root(config_root) / "model_builders.yaml")
     section = data.get("model_angelo") or data.get("modelangelo") or {}
     return section if isinstance(section, dict) else {}
+
+
+_BACKEND_ENV: Dict[str, Dict[str, Tuple[str, ...]]] = {
+    "modelangelo": {
+        "executable": ("MODELANGELO_EXECUTABLE",),
+        "repo_dir": ("MODELANGELO_REPO_DIR",),
+        "weights_dir": ("MODELANGELO_WEIGHTS_DIR", "MODELANGELO_TORCH_HOME"),
+    },
+    "emodelx": {
+        "executable": ("EMODELX_EXECUTABLE", "EMODELX_PYTHON"),
+        "repo_dir": ("EMODELX_REPO_DIR",),
+        "weights_dir": ("EMODELX_WEIGHTS_DIR",),
+    },
+    "mica": {
+        "executable": ("MICA_EXECUTABLE", "MICA_PYTHON"),
+        "repo_dir": ("MICA_REPO_DIR",),
+        "weights_dir": ("MICA_WEIGHTS_DIR",),
+    },
+    "topaz": {"executable": ("TOPAZ_EXECUTABLE",)},
+    "cryodrgn": {"executable": ("CRYODRGN_EXECUTABLE", "CRYODRGN_PYTHON")},
+}
+
+
+def _first_env(names: Sequence[str]) -> Optional[str]:
+    for name in names:
+        value = os.environ.get(name)
+        if value and value.strip():
+            return _expand_config_value(value)
+    return None
+
+
+def _safe_resolve(path: Path) -> str:
+    try:
+        return str(path.resolve())
+    except (OSError, PermissionError):
+        return str(path)
+
+
+def _candidate_paths(project_root: Optional[Path], *parts: str) -> Tuple[str, ...]:
+    roots: List[Path] = []
+    for raw in (
+        os.environ.get("CRYOAGENT_BACKEND_ROOT"),
+        os.environ.get("CRYOAGENT_ROOT"),
+        str(project_root.parent) if project_root else None,
+        str(Path.home() / "CryoAgent"),
+    ):
+        if raw and str(raw).strip():
+            roots.append(Path(_expand_config_value(str(raw))))
+    out: List[str] = []
+    for root in roots:
+        for part in parts:
+            out.append(str(root / part))
+    return tuple(dict.fromkeys(out))
 
 
 def _backend_definition(backend_name: str, *, config_root: Optional[Path] = None) -> Dict[str, Any]:
@@ -216,71 +377,89 @@ def _backend_definition(backend_name: str, *, config_root: Optional[Path] = None
     name = str(backend_name).strip().lower()
     if name == "modelangelo":
         cfg = _modelangelo_config(cfg_root)
-        torch_home = cfg.get("torch_home")
+        torch_home = _env_first("MODELANGELO_TORCH_HOME") or cfg.get("torch_home")
         weights_rel = cfg.get("weights_relpath")
-        weights = str(Path(str(torch_home)) / str(weights_rel)) if torch_home and weights_rel else torch_home
+        weights = _env_first("MODELANGELO_WEIGHTS_DIR") or (
+            str(Path(str(torch_home)) / str(weights_rel)) if torch_home and weights_rel else torch_home
+        )
         return {
             "category": "model_building",
-            "executable": cfg.get("executable"),
-            "default_executables": ("model_angelo",),
-            "repo_dir": cfg.get("repo_dir"),
+            "executable": _env_first("MODELANGELO_EXECUTABLE") or cfg.get("executable"),
+            "default_executables": ("model_angelo", "model-angelo"),
+            "repo_dir": _env_first("MODELANGELO_REPO_DIR") or cfg.get("repo_dir"),
             "weights_dir": weights,
             "required_runtime": ("executable", "weights_dir"),
+            "recommended_action": "Install ModelAngelo or set MODELANGELO_EXECUTABLE/MODELANGELO_WEIGHTS_DIR.",
         }
     if name == "emodelx":
         cfg = _safe_load_yaml(cfg_root / "emodelx.yaml")
-        repo = cfg.get("emodelx_repo_dir")
+        repo = _env_first("EMODELX_REPO_DIR") or cfg.get("emodelx_repo_dir")
         return {
             "category": "model_building",
-            "executable": cfg.get("emodelx_python") or sys.executable,
+            "executable": _env_first("EMODELX_EXECUTABLE", "EMODELX_PYTHON") or cfg.get("emodelx_python") or sys.executable,
             "default_executables": ("python3", "python"),
             "repo_dir": repo,
-            "weights_dir": str(Path(str(repo)) / "models") if repo else None,
+            "weights_dir": _env_first("EMODELX_WEIGHTS_DIR") or (str(Path(str(repo)) / "models") if repo else None),
             "required_runtime": ("executable", "repo_dir", "weights_dir"),
+            "recommended_action": "Install/configure EModelX or set EMODELX_REPO_DIR/EMODELX_WEIGHTS_DIR.",
         }
     if name == "mica":
         cfg = _safe_load_yaml(cfg_root / "mica.yaml")
-        repo = cfg.get("mica_repo_dir")
+        repo = _env_first("MICA_REPO_DIR") or cfg.get("mica_repo_dir")
         return {
             "category": "model_building",
-            "executable": cfg.get("mica_python") or sys.executable,
+            "executable": _env_first("MICA_EXECUTABLE", "MICA_PYTHON") or cfg.get("mica_python") or sys.executable,
             "default_executables": ("python3", "python"),
             "repo_dir": repo,
-            "weights_dir": str(Path(str(repo)) / "trained_models") if repo else None,
+            "weights_dir": _env_first("MICA_WEIGHTS_DIR") or (str(Path(str(repo)) / "trained_models") if repo else None),
             "required_runtime": ("executable", "repo_dir", "weights_dir"),
+            "recommended_action": "Install/configure MICA or set MICA_REPO_DIR/MICA_WEIGHTS_DIR.",
         }
     if name == "topaz":
         cfg = _safe_load_yaml(cfg_root / "topaz.yaml")
         return {
             "category": "picking",
-            "executable": cfg.get("topaz_executable"),
+            "executable": _env_first("TOPAZ_EXECUTABLE") or cfg.get("topaz_executable"),
             "default_executables": ("topaz",),
             "repo_dir": None,
             "weights_dir": cfg.get("topaz_model_path") or cfg.get("default_model_path"),
             "required_runtime": ("executable",),
+            "recommended_action": "Install Topaz or set TOPAZ_EXECUTABLE.",
         }
     if name == "cryodrgn":
         cfg = _safe_load_yaml(cfg_root / "cryodrgn.yaml")
         return {
             "category": "heterogeneity",
-            "executable": cfg.get("cryodrgn_executable"),
+            "executable": _env_first("CRYODRGN_EXECUTABLE", "CRYODRGN_PYTHON") or cfg.get("cryodrgn_executable"),
             "default_executables": ("cryodrgn",),
             "repo_dir": None,
             "weights_dir": None,
             "required_runtime": ("executable",),
+            "recommended_action": "Install cryoDRGN in the active environment or set CRYODRGN_EXECUTABLE.",
         }
     if name == "relion":
+        relion_bin = _env_first("RELION_BIN_DIR")
+
+        def _relion_cmd(env_name: str, default_name: str) -> str:
+            explicit = _env_first(env_name)
+            if explicit:
+                return explicit
+            return str(Path(relion_bin) / default_name) if relion_bin else default_name
+
         return {
             "category": "reconstruction",
             "relion_commands": (
-                "relion_autopick",
-                "relion_preprocess",
-                "relion_refine",
+                _relion_cmd("RELION_AUTOPICK_EXECUTABLE", "relion_autopick"),
+                _relion_cmd("RELION_PREPROCESS_EXECUTABLE", "relion_preprocess"),
+                _relion_cmd("RELION_REFINE_EXECUTABLE", "relion_refine"),
                 "relion_ctf_refine",
                 "relion_particle_polish",
-                "relion_postprocess",
+                _relion_cmd("RELION_POSTPROCESS_EXECUTABLE", "relion_postprocess"),
+                _relion_cmd("RELION_PIPELINER_EXECUTABLE", "relion_pipeliner"),
+                _relion_cmd("RELION_STAR_PRINTTABLE_EXECUTABLE", "relion_star_printtable"),
             ),
             "required_runtime": ("relion_commands",),
+            "recommended_action": "Install RELION CLI tools or set RELION_BIN_DIR/RELION_*_EXECUTABLE.",
         }
     return {"category": "unknown", "required_runtime": ()}
 
@@ -307,19 +486,31 @@ def preflight_backend(
     params: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Structured runtime preflight for one backend."""
-    del sequence_path  # Reserved for future input-level checks; this stage focuses runtime portability.
     name = str(backend_name).strip().lower()
     definition = _backend_definition(name, config_root=config_root)
     params = dict(params or {})
     warnings: List[str] = []
     missing_dependencies: List[str] = []
+    missing_inputs: List[str] = []
     path_checks: Dict[str, Any] = {}
 
-    exe_override = params.get("executable")
+    exe_override = (
+        params.get("executable")
+        or params.get(f"{name}_executable")
+        or params.get("model_angelo_executable")
+        or params.get("topaz_executable")
+        or params.get("cryodrgn_executable")
+    )
     executable = resolve_executable(
         str(exe_override).strip() if exe_override else definition.get("executable"),
         default_names=tuple(definition.get("default_executables") or ()),
+        env_vars=tuple(definition.get("executable_env_vars") or ()),
+        candidate_dirs=tuple(definition.get("candidate_dirs") or ()),
     )
+    executable_access = _first_access(executable)
+    executable_status = _status_from_access(executable_access, require_executable=True)
+    if executable.get("available"):
+        executable_status = "ok"
     if "executable" in definition.get("required_runtime", ()):
         path_checks["executable"] = executable
         if not executable.get("available"):
@@ -331,16 +522,21 @@ def preflight_backend(
         path_checks["repo_dir"] = repo_access
         if "repo_dir" in definition.get("required_runtime", ()) and not _path_component_ready(repo_access):
             missing_dependencies.append(f"{name}_repo_dir")
+    else:
+        repo_access = None
 
     weights_dir = params.get("weights_dir", definition.get("weights_dir"))
     if "weights_dir" in definition.get("required_runtime", ()) or weights_dir:
         weights_access = check_path_access(weights_dir)
         path_checks["weights_dir"] = weights_access
-        if "weights_dir" in definition.get("required_runtime", ()) and not _path_component_ready(
+        if "weights_dir" in definition.get("required_runtime", ()) and weights_dir and not _path_component_ready(
             weights_access, require_non_empty_dir=True
         ):
             missing_dependencies.append(f"{name}_weights_dir")
+    else:
+        weights_access = None
 
+    relion_status = "ok"
     if "relion_commands" in definition.get("required_runtime", ()):
         command_checks = {
             cmd: resolve_executable(cmd, default_names=(cmd,)) for cmd in definition.get("relion_commands", ())
@@ -349,13 +545,15 @@ def preflight_backend(
         missing = [cmd for cmd, check in command_checks.items() if not check.get("available")]
         if missing:
             missing_dependencies.extend(missing)
+            relion_status = "missing"
 
     out = output_dir or Path(project_root or ".") / ".cryoem_agent" / "backend_preflight" / name
     output_check = check_output_dir_writable(out)
     path_checks["output_dir"] = output_check
-    missing_inputs: List[str] = []
     if not output_check.get("writable_output_dir"):
         missing_inputs.append("output_dir")
+    if name in {"modelangelo", "emodelx", "mica"} and not sequence_path and not dry_run:
+        missing_inputs.append("sequence_path")
 
     for label, check in path_checks.items():
         if isinstance(check, dict) and check.get("path_stale"):
@@ -369,29 +567,42 @@ def preflight_backend(
             "dry_run_available because missing executable/repo/weights do not block dry-run; real_run_available=false"
         )
 
-    blocked_reason = None
-    if not real_run_available and not (dry_run and dry_run_available):
-        parts: List[str] = []
-        if missing_inputs:
-            parts.append(f"missing_or_unwritable_inputs: {','.join(missing_inputs)}")
-        if runtime_missing:
-            parts.append(f"missing_runtime_dependencies: {','.join(runtime_missing)}")
-        blocked_reason = "; ".join(parts) if parts else "unavailable"
-
-    return {
+    parts: List[str] = []
+    if missing_inputs:
+        parts.append(f"missing_or_unwritable_inputs: {','.join(dict.fromkeys(missing_inputs))}")
+    if runtime_missing:
+        parts.append(f"missing_runtime_dependencies: {','.join(runtime_missing)}")
+    blocked_reason = "; ".join(parts) if parts else None
+    output_dir_status = "ok" if output_check.get("writable_output_dir") else _status_from_access(output_check)
+    status = {
         "backend_name": name,
         "category": definition.get("category", "unknown"),
         "available": bool(dry_run_available if dry_run else real_run_available),
+        "status": "dry_run" if dry_run and dry_run_available else ("available" if real_run_available else "blocked"),
         "dry_run": bool(dry_run),
+        "input_suitable": not missing_inputs,
         "dry_run_available": bool(dry_run_available),
         "real_run_available": bool(real_run_available),
+        "executable_path": executable.get("resolved") or (executable_access or {}).get("path"),
+        "executable_status": relion_status if name == "relion" else executable_status,
+        "repo_dir_status": _status_from_access(repo_access) if repo_access is not None else "not_required_for_dry_run",
+        "weights_status": _status_from_access(weights_access) if weights_access is not None else "not_required_for_dry_run",
+        "python_module_status": "not_required_for_dry_run",
+        "gpu_status": "unknown" if os.environ.get("CUDA_VISIBLE_DEVICES") else "not_required_for_dry_run",
+        "output_dir_status": output_dir_status,
         "execution_mode": "dry_run" if dry_run and dry_run_available else ("real" if real_run_available else "unavailable"),
-        "missing_inputs": missing_inputs,
+        "missing_inputs": list(dict.fromkeys(missing_inputs)),
         "missing_dependencies": runtime_missing,
         "warnings": warnings,
         "blocked_reason": blocked_reason,
+        "recommended_action": str(definition.get("recommended_action") or "Install/configure backend dependencies, or run dry-run for planning only."),
+        "fallback_candidates": list(definition.get("fallback_candidates") or []),
+        "environment_fingerprint": environment_fingerprint(),
         "path_checks": path_checks,
     }
+    if dry_run and not real_run_available and dry_run_available:
+        status["executable_status"] = status["executable_status"] or "not_required_for_dry_run"
+    return status
 
 
 def _iter_scan_files(root: Path) -> Iterable[Path]:
@@ -437,18 +648,18 @@ def scan_stale_paths(root_dir: Any) -> Dict[str, Any]:
                         "path": candidate,
                         "stale_reasons": list(access.get("stale_reasons") or []),
                         "not_accessible": bool(access.get("not_accessible")),
+                        "accessible": not bool(access.get("not_accessible")),
                         "exists": access.get("exists"),
+                        "suggested_fix": _suggested_fix(candidate),
                     }
                 )
     return {"root_dir": str(root), "root_access": root_access, "findings": findings, "finding_count": len(findings)}
 
 
 def _runtime_backend_names() -> Tuple[str, ...]:
-    matrix = get_backend_capability_matrix()
     names = ["modelangelo", "emodelx", "mica", "topaz", "cryodrgn"]
-    if "relion" in matrix:
-        names.append("relion")
-    return tuple(name for name in names if name in matrix or name in {"topaz", "cryodrgn", "relion"})
+    names.append("relion")
+    return tuple(names)
 
 
 def preflight_all_backends(
@@ -473,12 +684,15 @@ def preflight_all_backends(
         )
         for name in backend_names
     }
+    fp = environment_fingerprint()
     return {
         "project_root": str(project_root),
         "sequence_path": str(sequence_path) if sequence_path else None,
         "dry_run": bool(dry_run),
-        "current_user": getpass.getuser(),
-        "python_executable": sys.executable,
+        "current_user": fp["current_user"],
+        "hostname": fp["hostname"],
+        "python_executable": fp["sys_executable"],
+        "environment_fingerprint": fp,
         "backends": results,
     }
 

@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 from uuid import uuid4
 
 from agent.backend_registry import get_backend_capability_matrix
+from agent.backend_runtime import preflight_all_backends
 from agent.backend_registry import model_action_to_backend, model_building_backend_to_action_name
 from agent.candidate_map_router import (
     action_parameters_from_record,
@@ -395,11 +396,21 @@ class Scheduler:
             preferred_backend=backend_id,
             availability_snapshot=self._selection_availability_snapshot(merged, "model_building"),
         )
+        runtime_matrix = preflight_all_backends(
+            project_root=Path(state.project_path),
+            sequence_path=Path(state.sequence_path) if state.sequence_path else None,
+            dry_run=True,
+            config_root=self.config_dir,
+            backends=("modelangelo", "emodelx", "mica"),
+        ).get("backends", {})
         decision = self._align_model_building_selection_with_action(
             decision,
             backend_id=backend_id,
             action_name=action_name,
         )
+        decision["backend_runtime_matrix"] = runtime_matrix
+        decision["dry_run"] = True
+        decision["execution_mode"] = "dry_run"
         merged["model_building_selection_decision"] = decision
         if action_name == ActionName.RUN_EMODELX:
             if pf.get("repo_path"):
@@ -818,11 +829,21 @@ class Scheduler:
             preferred_backend=preferred,
             availability_snapshot=self._selection_availability_snapshot(merged_params, "model_building"),
         )
+        runtime_matrix = preflight_all_backends(
+            project_root=Path(state.project_path),
+            sequence_path=Path(state.sequence_path) if state.sequence_path else None,
+            dry_run=True,
+            config_root=self.config_dir,
+            backends=("modelangelo", "emodelx", "mica"),
+        ).get("backends", {})
         decision = self._align_model_building_selection_with_action(
             decision,
             backend_id=mb_resolved,
             action_name=new_name,
         )
+        decision["backend_runtime_matrix"] = runtime_matrix
+        decision.setdefault("dry_run", True)
+        decision.setdefault("execution_mode", "dry_run")
         merged_params["model_building_selection_decision"] = decision
 
         priorities = self.structure_router.rules.get("priorities", {})
